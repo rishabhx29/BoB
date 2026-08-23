@@ -1,0 +1,475 @@
+# StreakPact — Task Tracker
+
+**Last Updated:** August 23, 2026  
+**Status:** Phase 0 — Planning Complete ✅  
+
+**Legend:** `[ ]` Not Started · `[/]` In Progress · `[x]` Completed
+
+---
+
+## Phase 1: Foundation & Project Setup (1.5 weeks)
+
+### 1.1 Project Initialization
+- [ ] Initialize Expo project with TypeScript template
+- [ ] Configure `tsconfig.json` with strict mode and path aliases
+- [ ] Set up ESLint + Prettier
+- [ ] Initialize Git repo, `.gitignore`, `develop`/`main` branches
+- [ ] Configure `app.json` / `app.config.ts` with metadata, splash, scheme
+
+### 1.2 Navigation Architecture
+- [ ] Install React Navigation v7 (Stack + Bottom Tabs)
+- [ ] Create Auth Stack (Splash → Onboarding → Login → Register)
+- [ ] Create Main Tab Navigator (Home, Groups, Submit FAB, Leaderboard, Profile)
+- [ ] Implement center Submit tab as raised pill FAB
+- [ ] Configure deep linking for `streakpact://invite/:code`
+- [ ] Add screen transition animations
+
+### 1.3 Design System Implementation
+- [ ] Create `constants/theme.ts` with Tactile Hardware tokens (colors, drop/inset shadows)
+- [ ] Install fonts: Inter, Roboto Mono
+- [ ] Build base components: Text, Button (with physical press states), Card (pillowy), Avatar, Badge, Chip, Input
+- [ ] Build StatusIndicator component (LED states)
+- [ ] Build skeleton loader components
+- [ ] Configure Tailwind neumorphic shadow utilities
+- [ ] Build animated components: StreakCounter (digital display), XPChip, ConfettiBurst
+- [ ] Create BottomSheet reusable component
+
+### 1.4 Backend Infrastructure
+- [ ] Create Supabase project + configure env variables
+- [ ] Create Firebase project (Auth, Firestore, Cloud Messaging)
+- [ ] Create Supabase database tables (users, groups, group_members, activities, submissions, streaks, badges, user_badges)
+- [ ] Configure Row-Level Security (RLS) policies
+- [ ] Set up Supabase Storage bucket `submission-photos`
+- [ ] Create Firestore collections structure
+- [ ] Write Firestore security rules
+- [ ] Set up Supabase Edge Functions project
+
+### 1.5 State Management & Data Layer
+- [ ] Install and configure Zustand stores
+- [ ] Install TanStack Query with QueryClient config
+- [ ] Create API service layer with Supabase/Firebase clients
+- [ ] Set up offline submission queue (AsyncStorage)
+- [ ] Create custom hooks: useCurrentUser, useGroups, useActivities, useSubmissions, useStreaks
+
+---
+
+## Phase 2: Authentication & Onboarding (1.5 weeks)
+
+### 2.1 Splash Screen
+- [ ] Animated splash with Volt mascot Lottie
+- [ ] Auto-redirect logic (JWT check)
+- [ ] App version check
+
+### 2.2 Onboarding Carousel
+- [ ] 3-slide animated value prop carousel
+- [ ] Parallax scroll animation on illustrations
+- [ ] Skip button + dot indicators + "Get Started" CTA
+- [ ] Store onboarding completion in AsyncStorage
+
+### 2.3 Authentication Screens
+- [ ] Login screen (email/password + Google OAuth)
+- [ ] Register screen (email/password + Google OAuth)
+- [ ] Firebase Auth integration (create, login, Google sign-in)
+- [ ] Email verification flow
+- [ ] JWT token management (SecureStore)
+- [ ] Error handling (invalid credentials, existing email, network)
+- [ ] Form validation (React Hook Form + Zod)
+
+### 2.4 Username & Avatar Setup
+- [ ] Username input with real-time availability check
+- [ ] Username validation (3–20 chars, alphanumeric + underscore)
+- [ ] Avatar picker (12 presets + camera upload)
+- [ ] Camera upload + crop + compress + upload to Supabase Storage
+- [ ] Create user record in Supabase `users` table
+
+### 2.5 "Start a Pact or Join One" Screen
+- [ ] Two illustrated action cards with animated entrance
+- [ ] Deep link invite code auto-handling
+
+### 2.6 Biometric Login
+- [ ] Expo LocalAuthentication integration
+- [ ] Settings toggle for enable/disable
+- [ ] Fallback to email/password
+
+---
+
+## Phase 3: Groups & Team Management (2 weeks)
+
+### 3.1 Groups List Screen
+- [ ] Scrollable group list with GroupCard components
+- [ ] Group card: name, emoji, stacked avatars, activities count, submission status
+- [ ] Tap → Group Home; Long-press → Leave confirmation
+- [ ] FAB: Create / Join action sheet
+- [ ] Empty state with Volt illustration
+- [ ] Pull-to-refresh
+
+### 3.2 Create Group Flow
+- [ ] Step 1: Group name + emoji picker
+- [ ] Step 2: Choose starting activities (presets + custom)
+- [ ] Step 3: Set group "vibe" (optional)
+- [ ] Step 4: Group goal description (optional)
+- [ ] Step 5: Invite screen (code + link + QR)
+- [ ] Store group in Supabase, assign ADMIN role
+- [ ] Invite code generation with collision retry
+
+### 3.3 Join Group Flow
+- [ ] Manual code entry (segmented 6-char input)
+- [ ] Deep link auto-fill join
+- [ ] QR code scanner (Expo Camera)
+- [ ] Validate invite code
+- [ ] Check group capacity (max 6)
+- [ ] "Group is full" error handling
+- [ ] Add to group_members, trigger notification
+
+### 3.4 Group Home Screen
+- [ ] Header: group info + member avatars + group streak
+- [ ] Feed Tab (group-filtered submission feed)
+- [ ] Activities Tab (activity cards with member streak grid)
+- [ ] Members Tab (member list with XP, level, streak, Nudge button)
+- [ ] Leaderboard Tab (ranked by monthly XP)
+- [ ] Admin settings gear icon
+
+### 3.5 Group Settings (Admin)
+- [ ] Rename group, change emoji
+- [ ] Add/archive activities
+- [ ] Submission window config
+- [ ] Rest days config
+- [ ] Photo proof toggle
+- [ ] Group streak toggle
+- [ ] Remove members
+- [ ] Regenerate invite code
+- [ ] Delete group (soft delete)
+
+### 3.6 Group Invite Sharing
+- [ ] Share sheet with formatted message
+- [ ] Copy code with haptic feedback
+- [ ] QR code generation (SVG)
+
+---
+
+## Phase 4: Activity System & Templates (1.5 weeks)
+
+### 4.1 Activity Templates Engine
+- [ ] Define all 9 preset activity templates (fields, icons, colors)
+- [ ] Field definition schema (text, number, multiselect, singleselect, toggle, stars, emoji-scale)
+- [ ] Store as `constants/activityTemplates.ts`
+
+### 4.2 Create Activity Flow
+- [ ] Activity selector grid (preset cards + "Create Custom")
+- [ ] Preset flow: select → configure frequency → rest days → photo toggle → confirm
+- [ ] Custom flow: name + icon + color → frequency → custom fields → photo → confirm
+- [ ] Store activity in Supabase `activities` table
+
+### 4.3 Activity Card Component
+- [ ] Color-coded header bar
+- [ ] Member streak grid (avatar + streak + today status)
+- [ ] "Submit for today" CTA with pulsing glow
+
+### 4.4 Activity Detail Screen
+- [ ] Header with icon, name, color
+- [ ] Calendar | Submissions History tabs
+- [ ] Activity info (frequency, rest days, fields)
+- [ ] Admin actions: Edit, Archive
+
+### 4.5 Dynamic Form Renderer
+- [ ] Generic DynamicForm component from templateFields JSON
+- [ ] Text field renderer
+- [ ] Number field renderer
+- [ ] Multi-select chips renderer
+- [ ] Single select renderer
+- [ ] Toggle renderer
+- [ ] Star rating renderer
+- [ ] Emoji scale renderer
+- [ ] Required field validation + inline errors
+- [ ] React Hook Form integration
+
+---
+
+## Phase 5: Submission System & Media (2 weeks)
+
+### 5.1 Submission Entry Points
+- [ ] FAB → activity selector bottom sheet → submission flow
+- [ ] Activity card "Submit" → direct submission flow
+- [ ] Today Banner dot → direct submission flow
+
+### 5.2 Camera & Photo Step
+- [ ] Expo ImagePicker (camera default + gallery)
+- [ ] Camera overlay with activity name badge
+- [ ] "Skip photo" button
+- [ ] Crop interface (1:1 or 4:5)
+- [ ] Auto-compression (≤800KB)
+- [ ] Photo preview with retake/remove
+
+### 5.3 Activity Fields Step
+- [ ] Dynamic form rendering based on activity template
+- [ ] Required field validation
+- [ ] Keyboard-avoiding scroll view
+
+### 5.4 Title & Description Step
+- [ ] Title input (80 chars, optional)
+- [ ] Description textarea (500 chars, optional)
+- [ ] Character counters
+- [ ] Quick suggestion chips
+
+### 5.5 Confirm & Submit Step
+- [ ] Preview card (photo + title + field summary)
+- [ ] "Submit StreakPact 🚀" button
+- [ ] Submit pipeline: timestamp → upload photo → create record → Firestore mirror → streak update → XP → notify
+- [ ] Confetti + XP animation + Volt cheers
+- [ ] Navigate to feed
+
+### 5.6 Submission Edit & Delete
+- [ ] Edit within 1 hour (title, description, fields only)
+- [ ] Delete within 24 hours (streak break warning)
+- [ ] Sync edits/deletes to Supabase + Firestore
+
+### 5.7 Offline Queue
+- [ ] AsyncStorage queue for offline submissions
+- [ ] Offline banner
+- [ ] Auto-upload on reconnect with original timestamps
+- [ ] Toast notification on sync
+- [ ] Handle photo upload failures gracefully
+
+---
+
+## Phase 6: Calendar & Streak Engine (2 weeks)
+
+### 6.1 Group Calendar View
+- [ ] Month grid (7-column, current month)
+- [ ] Member dots per day cell (green/red/orange/grey/purple)
+- [ ] Tap day → bottom sheet with member submissions
+- [ ] Month navigation (swipe left/right)
+- [ ] "Today" snap-back button
+
+### 6.2 Streak Summary Bar
+- [ ] Member streak cards (avatar, name, current/longest streak, total)
+- [ ] Sorted by current streak descending
+- [ ] Animated flame icon scaling
+
+### 6.3 Comparative View (2-Person)
+- [ ] Side-by-side mini calendars
+- [ ] Streak battle banner
+- [ ] Animated versus indicator
+
+### 6.4 Year Overview (GitHub-Style)
+- [ ] 365-cell heat map
+- [ ] Color intensity by submission count
+- [ ] Tap month → jump to detail view
+
+### 6.5 Streak Calculation Engine
+- [ ] Supabase Edge Function / pg_cron daily job (00:05 UTC)
+- [ ] Streak break detection per user per activity
+- [ ] Milestone detection (7/14/30/60/100)
+- [ ] Timezone handling (user device TZ)
+- [ ] 2-minute grace window for edge-case submissions
+
+### 6.6 Streak Shields
+- [ ] Earn 1 shield per 7 consecutive days
+- [ ] Max stockpile: 3
+- [ ] Missed day modal: "Use shield?"
+- [ ] Shield consumption logic
+- [ ] 1 shield per activity per week rule
+- [ ] Shield count UI on activity cards + profile
+
+### 6.7 Rest Day System
+- [ ] Declare rest day (before midnight)
+- [ ] Rest day picker bottom sheet
+- [ ] Calendar grey dot with 🛌 icon
+- [ ] 0–2 rest days per week limit
+- [ ] No backdating rule
+
+---
+
+## Phase 7: Social Features & Feed (1.5 weeks)
+
+### 7.1 Home Feed
+- [ ] Chronological aggregated feed
+- [ ] Feed card component (full anatomy)
+- [ ] Feed filters: All, By Group, By Activity
+- [ ] Empty state with Volt
+- [ ] Pull-to-refresh animation
+- [ ] Infinite scroll pagination (20/page)
+
+### 7.2 Today Banner
+- [ ] Horizontal scroll at top
+- [ ] Activity icon + name + status (✅/🟠)
+- [ ] Tap pending → launch submission flow
+- [ ] Sticky with blur backdrop
+
+### 7.3 Reactions System
+- [ ] 5 emoji reactions (🔥💪👏❤️💯)
+- [ ] Tap to react / un-react with animation
+- [ ] One reaction per user per submission
+- [ ] Reaction counts display
+- [ ] Tap count → who-reacted bottom sheet
+- [ ] Firestore real-time sync
+
+### 7.4 Comments System
+- [ ] Expandable comment section
+- [ ] Comment input + send button
+- [ ] Comment display (avatar, name, text, timestamp)
+- [ ] @mention autocomplete
+- [ ] Firestore real-time listener
+
+### 7.5 Nudge System
+- [ ] Nudge button visibility logic (after noon, not submitted)
+- [ ] Lightning bolt animation
+- [ ] Push notification to recipient
+- [ ] 4-hour cooldown per recipient
+- [ ] Hype Man XP bonus (submit within 2hr of nudge)
+- [ ] Firestore nudge storage
+
+### 7.6 Weekly Wrap-Up Card
+- [ ] Auto-generate Sunday 7 PM (Supabase scheduled function)
+- [ ] Card content: group + activity + member stats + MVP
+- [ ] Shareable PNG generation
+- [ ] "Share to Instagram/WhatsApp" export
+- [ ] Card stored in Supabase Storage
+
+---
+
+## Phase 8: Gamification & Rewards (1.5 weeks)
+
+### 8.1 XP Engine
+- [ ] Implement XP formula (base + bonuses × streak multiplier)
+- [ ] XP award Edge Function on submission create
+- [ ] Reaction bonus recalculation (on 3rd reaction)
+- [ ] XP chip animation
+
+### 8.2 Leveling System
+- [ ] 7 levels with XP thresholds
+- [ ] Level progress bar (animated fill)
+- [ ] Level-up celebration animation
+- [ ] Level badge display everywhere
+
+### 8.3 Badges & Achievements
+- [ ] Streak badges (5): First Flame, Charged, Diamond Grinder, Unstoppable, Legend
+- [ ] Activity badges (4): Iron Body, Scholar, Algorithm Brain, Road Runner
+- [ ] Social badges (3): Hype Man, Team Captain, Coach
+- [ ] Special badges (4): Early Bird, Night Owl, Shield Bearer, Comeback Kid
+- [ ] Badge unlock detection (DB triggers / Edge Functions)
+- [ ] Unlock notification (push + in-app toast)
+- [ ] Badge display (earned = color, unearned = greyscale locked)
+
+### 8.4 Weekly Challenges
+- [ ] Auto-generate Monday challenges (Supabase scheduled function)
+- [ ] Custom challenge creation by group members
+- [ ] Challenge card in Group Home (progress bar, deadline)
+- [ ] Challenge completion (confetti + badge)
+
+### 8.5 Leaderboard
+- [ ] Group leaderboard (monthly XP)
+- [ ] Animated bar chart with avatars
+- [ ] Monthly reset + "Last champion" highlight
+- [ ] Rank change indicators
+
+---
+
+## Phase 9: Notifications & User Profile (1.5 weeks)
+
+### 9.1 Push Notifications
+- [ ] Expo Notifications + FCM integration
+- [ ] All 13 notification types implemented
+- [ ] Notification scheduling (pg_cron + FCM)
+- [ ] Casual motivating copy tone
+
+### 9.2 Notification Settings
+- [ ] Per-type toggles
+- [ ] Per-activity granularity
+- [ ] Quiet hours
+- [ ] Weekend mode
+
+### 9.3 In-App Notification Center
+- [ ] Bell icon with unread count
+- [ ] Notification list
+- [ ] Tap → deep link
+- [ ] "Mark all as read"
+
+### 9.4 User Profile Screen
+- [ ] Header: avatar, name, username, level, XP bar, shields
+- [ ] Stats overview (4 cards)
+- [ ] Active streaks scroll
+- [ ] Achievements grid
+- [ ] Activity history (filterable)
+- [ ] Year in review heat map
+- [ ] Groups list
+- [ ] Public profile (read-only)
+
+### 9.5 Settings Screen
+- [ ] Account settings
+- [ ] Notification settings
+- [ ] Appearance settings
+- [ ] Privacy settings
+- [ ] Data & Storage settings
+- [ ] About section
+
+---
+
+## Phase 10: Polish, Testing & Launch (2 weeks)
+
+### 10.1 Animations
+- [ ] All 9 key animations from design.md
+- [ ] Micro-interactions + haptics
+- [ ] Skeleton shimmers
+- [ ] Volt mascot (toggleable)
+
+### 10.2 Accessibility
+- [ ] 44×44pt touch targets
+- [ ] Icon + color status indicators
+- [ ] Reduced motion mode
+- [ ] Font scaling 140% test
+- [ ] Screen reader labels
+- [ ] WCAG AA contrast
+- [ ] VoiceOver + TalkBack testing
+
+### 10.3 Performance
+- [ ] Image lazy loading
+- [ ] FlatList virtualization
+- [ ] Bundle size optimization
+- [ ] Hermes optimization
+- [ ] Memory profiling
+- [ ] Cache strategy tuning
+
+### 10.4 Testing
+- [ ] Unit tests
+- [ ] Integration tests
+- [ ] E2E tests (Detox)
+- [ ] Backend tests
+- [ ] Manual QA (device matrix)
+- [ ] Accessibility testing
+- [ ] Offline testing
+
+### 10.5 App Store Prep
+- [ ] App icons
+- [ ] Marketing screenshots
+- [ ] Store descriptions
+- [ ] Privacy policy + ToS
+- [ ] EAS Build production profiles
+- [ ] TestFlight / Internal testing
+
+### 10.6 Launch Checklist
+- [ ] Security audit (RLS + Firestore rules)
+- [ ] Rate limiting
+- [ ] Error tracking (Sentry)
+- [ ] Analytics (PostHog)
+- [ ] Monitoring dashboard
+- [ ] Backup strategy
+- [ ] Incident response playbook
+
+---
+
+## Progress Summary
+
+| Phase | Tasks | Done | Status |
+|---|---|---|---|
+| 1. Foundation | 28 | 0 | ⬜ Not Started |
+| 2. Auth & Onboarding | 21 | 0 | ⬜ Not Started |
+| 3. Groups & Teams | 29 | 0 | ⬜ Not Started |
+| 4. Activity System | 20 | 0 | ⬜ Not Started |
+| 5. Submissions | 24 | 0 | ⬜ Not Started |
+| 6. Calendar & Streaks | 24 | 0 | ⬜ Not Started |
+| 7. Social & Feed | 24 | 0 | ⬜ Not Started |
+| 8. Gamification | 17 | 0 | ⬜ Not Started |
+| 9. Notifications & Profile | 26 | 0 | ⬜ Not Started |
+| 10. Polish & Launch | 30 | 0 | ⬜ Not Started |
+| **Total** | **243** | **0** | **0%** |
