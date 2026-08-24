@@ -1,0 +1,116 @@
+// firestore.rules
+// Deploy with: firebase deploy --only firestore:rules
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ─── Helper Functions ───────────────────────────────────────────────────
+
+    // Check if the request is from an authenticated user
+    function isAuth() {
+      return request.auth != null;
+    }
+
+    // Check if the requesting user matches the given uid
+    function isSelf(uid) {
+      return isAuth() && request.auth.uid == uid;
+    }
+
+    // Check if a user is a member of a group
+    // Note: This requires keeping a /group_members/{groupId}/{userId} mirror
+    // or using Supabase for the source of truth (checked via Edge Function)
+    function isGroupMember(groupId) {
+      return isAuth() && exists(
+        /databases/$(database)/documents/group_members/$(groupId)/$(request.auth.uid)
+      );
+    }
+
+    // ─── Feed: /feed/{groupId}/submissions/{submissionId} ──────────────────
+
+    match /feed/{groupId}/submissions/{submissionId} {
+      // Group members can read the feed
+      allow read: if isGroupMember(groupId);
+
+      // Only the submitting user can create/update their own entry
+      allow create: if isAuth() &&
+        request.resource.data.userId == request.auth.uid;
+
+      allow update: if isAuth() &&
+        resource.data.userId == request.auth.uid;
+
+      allow delete: if isAuth() &&
+        resource.data.userId == request.auth.uid;
+    }
+
+    // ─── Reactions: /reactions/{submissionId}/users/{userId} ──────────────
+
+    match /reactions/{submissionId}/users/{userId} {
+      // Anyone authenticated can read reactions (for now — refine to group members)
+      allow read: if isAuth();
+
+      // Users can only react/un-react as themselves
+      allow write: if isSelf(userId);
+    }
+
+    // ─── Comments: /comments/{submissionId}/list/{commentId} ──────────────
+
+    match /comments/{submissionId}/list/{commentId} {
+      allow read: if isAuth();
+
+      // Users can create comments
+      allow create: if isAuth() &&
+        request.resource.data.userId == request.auth.uid;
+
+      // Users can only delete their own comments
+      allow delete: if isAuth() &&
+        resource.data.userId == request.auth.uid;
+
+      // No editing comments
+      allow update: if false;
+    }
+
+    // ─── Nudges: /nudges/{recipientId}/queue/{nudgeId} ────────────────────
+
+    match /nudges/{recipientId}/queue/{nudgeId} {
+      // Recipient can read their own nudge queue
+      allow read: if isSelf(recipientId);
+
+      // Any authenticated user can send a nudge
+      allow create: if isAuth() &&
+        request.resource.data.senderId == request.auth.uid &&
+        request.resource.data.senderId != recipientId;  // Can't nudge yourself
+
+      // No update/delete on nudges
+      allow update, delete: if false;
+    }
+
+    // ─── Notifications: /notifications/{userId}/list/{notifId} ─────────────
+
+    match /notifications/{userId}/list/{notifId} {
+      // Users can only read their own notifications
+      allow read: if isSelf(userId);
+
+      // Only the backend (via Admin SDK / Cloud Functions) can create
+      // Client-side writes forbidden for security
+      allow write: if false;
+    }
+
+    // ─── Group Members Mirror: /group_members/{groupId}/{userId} ──────────
+    // This is a lightweight mirror of Supabase group_members for Firestore rules
+
+    match /group_members/{groupId}/{userId} {
+      // Readable by authenticated users (used by isGroupMember helper)
+      allow read: if isAuth();
+
+      // Only the backend (Edge Functions) writes here on join/leave
+      allow write: if false;
+    }
+
+    // ─── Default: Deny all other access ────────────────────────────────────
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
