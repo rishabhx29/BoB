@@ -2,19 +2,49 @@ import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import AuthNavigator from './AuthNavigator';
 import MainTabNavigator from './MainTabNavigator';
+import { useAuthStore } from '@/store/useAuthStore';
+
+// Group Screens
+import CreateGroupScreen from '@/screens/Groups/CreateGroupScreen';
+import JoinGroupScreen from '@/screens/Groups/JoinGroupScreen';
+import GroupHomeScreen from '@/screens/Groups/GroupHomeScreen';
+import GroupSettingsScreen from '@/screens/Groups/GroupSettingsScreen';
 
 const Stack = createNativeStackNavigator();
 
 export default function RootNavigator() {
-  // Replace with actual auth check later
-  const isAuthenticated = false; 
+  const { isAuthenticated } = useAuthStore(); 
 
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       {!isAuthenticated ? (
         <Stack.Screen name="Auth" component={AuthNavigator} />
       ) : (
-        <Stack.Screen name="Main" component={MainTabNavigator} />
+        <>
+          <Stack.Screen name="Main" component={MainTabNavigator} />
+          
+          {/* Group Stack */}
+          <Stack.Screen 
+            name="CreateGroup" 
+            component={CreateGroupScreen} 
+            options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
+          />
+          <Stack.Screen 
+            name="JoinGroup" 
+            component={JoinGroupScreen} 
+            options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
+          />
+          <Stack.Screen 
+            name="GroupHome" 
+            component={GroupHomeScreen} 
+            options={{ animation: 'slide_from_right' }}
+          />
+          <Stack.Screen 
+            name="GroupSettings" 
+            component={GroupSettingsScreen} 
+            options={{ animation: 'slide_from_right' }}
+          />
+        </>
       )}
     </Stack.Navigator>
   );
