@@ -38,6 +38,7 @@ export interface Group {
   adminId: string;
   createdAt: string;
   updatedAt: string;
+  deletedAt?: string | null;      // Soft delete timestamp
 }
 
 export type GroupRole = 'admin' | 'member';
@@ -209,4 +210,41 @@ export interface DayStatus {
   date: string;                   // YYYY-MM-DD
   status: StreakStatus;
   submissionId?: string;
+}
+
+// ─── Service Input Types ─────────────────────────────────────────────────────
+
+export interface CreateGroupInput {
+  name: string;
+  emoji: string;
+  vibe: GroupVibe | null;
+  goalDescription: string | null;
+}
+
+export interface ActivitySeed {
+  name: string;
+  icon: string;
+  color: string;
+  frequency: ActivityFrequency;
+  frequencyDays: number[];        // 0=Sun … 6=Sat
+  requirePhoto: boolean;
+}
+
+export interface AddActivityInput {
+  name: string;
+  icon: string;
+  color: string;
+  frequency?: ActivityFrequency;
+  frequencyDays?: number[];
+  requirePhoto?: boolean;
+}
+
+export interface UpdateGroupInput {
+  name?: string;
+  emoji?: string;
+  vibe?: GroupVibe | null;
+  goalDescription?: string | null;
+  submissionWindowStart?: string; // HH:MM
+  submissionWindowEnd?: string;   // HH:MM
+  groupStreakEnabled?: boolean;
 }
