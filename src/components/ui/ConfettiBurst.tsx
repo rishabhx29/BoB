@@ -121,7 +121,7 @@ export function ConfettiBurst({ isVisible, pieceCount = 40 }: ConfettiBurstProps
 
 const styles = StyleSheet.create({
   container: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     zIndex: 9999,
     overflow: 'hidden',
   },

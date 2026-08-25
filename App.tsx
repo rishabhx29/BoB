@@ -23,7 +23,7 @@ import { queryClient } from './src/services/queryClient';
 SplashScreen.preventAutoHideAsync();
 
 // Deep link config for invite codes: streakpact://join/XXXXXX
-const linking = {
+const linking: any = {
   prefixes: ['streakpact://'],
   config: {
     screens: {
@@ -37,12 +37,12 @@ const linking = {
       },
       Main: {
         screens: {
-          Groups: 'join/:code',
           Home: 'home',
           Leaderboard: 'leaderboard',
           Profile: 'profile',
         },
       },
+      JoinGroup: 'join/:code',
     },
   },
 };
@@ -74,7 +74,7 @@ export default function App() {
           <NavigationContainer linking={linking}>
             <RootNavigator />
           </NavigationContainer>
-          <StatusBar style="dark" backgroundColor="transparent" translucent />
+          <StatusBar style="dark" />
         </View>
       </SafeAreaProvider>
     </QueryClientProvider>
