@@ -22,7 +22,7 @@ export default function MainTabNavigator() {
         options={{
           tabBarButton: (props) => (
             <TouchableOpacity 
-              {...props} 
+              {...(props as any)} 
               style={{
                 top: -15,
                 justifyContent: 'center',

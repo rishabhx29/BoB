@@ -48,7 +48,7 @@
 - [x] Install and configure Zustand stores
 - [x] Install TanStack Query with QueryClient config
 - [x] Create API service layer with Supabase/Firebase clients
-- [ ] Set up offline submission queue (AsyncStorage)
+- [x] Set up offline submission queue (AsyncStorage)
 - [ ] Create custom hooks: useCurrentUser, useGroups, useActivities, useSubmissions, useStreaks
 
 ---
@@ -56,94 +56,94 @@
 ## Phase 2: Authentication & Onboarding (1.5 weeks)
 
 ### 2.1 Splash Screen
-- [ ] Animated splash with Volt mascot Lottie
-- [ ] Auto-redirect logic (JWT check)
+- [x] Animated splash with Volt mascot Lottie
+- [x] Auto-redirect logic (JWT check)
 - [ ] App version check
 
 ### 2.2 Onboarding Carousel
-- [ ] 3-slide animated value prop carousel
-- [ ] Parallax scroll animation on illustrations
-- [ ] Skip button + dot indicators + "Get Started" CTA
-- [ ] Store onboarding completion in AsyncStorage
+- [x] 3-slide animated value prop carousel
+- [x] Parallax scroll animation on illustrations
+- [x] Skip button + dot indicators + "Get Started" CTA
+- [x] Store onboarding completion in AsyncStorage
 
 ### 2.3 Authentication Screens
-- [ ] Login screen (email/password + Google OAuth)
-- [ ] Register screen (email/password + Google OAuth)
-- [ ] Firebase Auth integration (create, login, Google sign-in)
+- [x] Login screen (email/password + Google OAuth)
+- [x] Register screen (email/password + Google OAuth)
+- [x] Firebase Auth integration (create, login, Google sign-in)
 - [ ] Email verification flow
-- [ ] JWT token management (SecureStore)
-- [ ] Error handling (invalid credentials, existing email, network)
-- [ ] Form validation (React Hook Form + Zod)
+- [x] JWT token management (SecureStore)
+- [x] Error handling (invalid credentials, existing email, network)
+- [x] Form validation (React Hook Form + Zod)
 
 ### 2.4 Username & Avatar Setup
-- [ ] Username input with real-time availability check
-- [ ] Username validation (3–20 chars, alphanumeric + underscore)
-- [ ] Avatar picker (12 presets + camera upload)
+- [x] Username input with real-time availability check
+- [x] Username validation (3–20 chars, alphanumeric + underscore)
+- [x] Avatar picker (12 presets + camera upload)
 - [ ] Camera upload + crop + compress + upload to Supabase Storage
 - [ ] Create user record in Supabase `users` table
 
 ### 2.5 "Start a Pact or Join One" Screen
-- [ ] Two illustrated action cards with animated entrance
-- [ ] Deep link invite code auto-handling
+- [x] Two illustrated action cards with animated entrance
+- [x] Deep link invite code auto-handling
 
 ### 2.6 Biometric Login
-- [ ] Expo LocalAuthentication integration
-- [ ] Settings toggle for enable/disable
-- [ ] Fallback to email/password
+- [x] Expo LocalAuthentication integration
+- [x] Settings toggle for enable/disable
+- [x] Fallback to email/password
 
 ---
 
 ## Phase 3: Groups & Team Management (2 weeks)
 
 ### 3.1 Groups List Screen
-- [ ] Scrollable group list with GroupCard components
-- [ ] Group card: name, emoji, stacked avatars, activities count, submission status
-- [ ] Tap → Group Home; Long-press → Leave confirmation
-- [ ] FAB: Create / Join action sheet
-- [ ] Empty state with Volt illustration
-- [ ] Pull-to-refresh
+- [x] Scrollable group list with GroupCard components
+- [x] Group card: name, emoji, stacked avatars, activities count, submission status
+- [x] Tap → Group Home; Long-press → Leave confirmation
+- [x] FAB: Create / Join action sheet
+- [x] Empty state with Volt illustration
+- [x] Pull-to-refresh
 
 ### 3.2 Create Group Flow
-- [ ] Step 1: Group name + emoji picker
-- [ ] Step 2: Choose starting activities (presets + custom)
-- [ ] Step 3: Set group "vibe" (optional)
-- [ ] Step 4: Group goal description (optional)
-- [ ] Step 5: Invite screen (code + link + QR)
+- [x] Step 1: Group name + emoji picker
+- [x] Step 2: Choose starting activities (presets + custom)
+- [x] Step 3: Set group "vibe" (optional)
+- [x] Step 4: Group goal description (optional)
+- [x] Step 5: Invite screen (code + link + QR)
 - [ ] Store group in Supabase, assign ADMIN role
 - [ ] Invite code generation with collision retry
 
 ### 3.3 Join Group Flow
-- [ ] Manual code entry (segmented 6-char input)
-- [ ] Deep link auto-fill join
-- [ ] QR code scanner (Expo Camera)
-- [ ] Validate invite code
-- [ ] Check group capacity (max 6)
-- [ ] "Group is full" error handling
+- [x] Manual code entry (segmented 6-char input)
+- [x] Deep link auto-fill join
+- [x] QR code scanner (Expo Camera)
+- [x] Validate invite code
+- [x] Check group capacity (max 6)
+- [x] "Group is full" error handling
 - [ ] Add to group_members, trigger notification
 
 ### 3.4 Group Home Screen
-- [ ] Header: group info + member avatars + group streak
-- [ ] Feed Tab (group-filtered submission feed)
-- [ ] Activities Tab (activity cards with member streak grid)
-- [ ] Members Tab (member list with XP, level, streak, Nudge button)
-- [ ] Leaderboard Tab (ranked by monthly XP)
-- [ ] Admin settings gear icon
+- [x] Header: group info + member avatars + group streak
+- [x] Feed Tab (group-filtered submission feed)
+- [x] Activities Tab (activity cards with member streak grid)
+- [x] Members Tab (member list with XP, level, streak, Nudge button)
+- [x] Leaderboard Tab (ranked by monthly XP)
+- [x] Admin settings gear icon
 
 ### 3.5 Group Settings (Admin)
-- [ ] Rename group, change emoji
-- [ ] Add/archive activities
-- [ ] Submission window config
-- [ ] Rest days config
-- [ ] Photo proof toggle
-- [ ] Group streak toggle
-- [ ] Remove members
-- [ ] Regenerate invite code
-- [ ] Delete group (soft delete)
+- [x] Rename group, change emoji
+- [x] Add/archive activities
+- [x] Submission window config
+- [x] Rest days config
+- [x] Photo proof toggle
+- [x] Group streak toggle
+- [x] Remove members
+- [x] Regenerate invite code
+- [x] Delete group (soft delete)
 
 ### 3.6 Group Invite Sharing
-- [ ] Share sheet with formatted message
-- [ ] Copy code with haptic feedback
-- [ ] QR code generation (SVG)
+- [x] Share sheet with formatted message
+- [x] Copy code with haptic feedback
+- [x] QR code generation (SVG)
 
 ---
 
@@ -462,9 +462,9 @@
 
 | Phase | Tasks | Done | Status |
 |---|---|---|---|
-| 1. Foundation | 28 | 25 | 🔄 In Progress |
-| 2. Auth & Onboarding | 21 | 0 | ⬜ Not Started |
-| 3. Groups & Teams | 29 | 0 | ⬜ Not Started |
+| 1. Foundation | 32 | 30 | [/] In Progress |
+| 2. Auth & Onboarding | 24 | 20 | [/] In Progress |
+| 3. Groups & Teams | 38 | 35 | [/] In Progress |
 | 4. Activity System | 20 | 0 | ⬜ Not Started |
 | 5. Submissions | 24 | 0 | ⬜ Not Started |
 | 6. Calendar & Streaks | 24 | 0 | ⬜ Not Started |
@@ -472,4 +472,4 @@
 | 8. Gamification | 17 | 0 | ⬜ Not Started |
 | 9. Notifications & Profile | 26 | 0 | ⬜ Not Started |
 | 10. Polish & Launch | 30 | 0 | ⬜ Not Started |
-| **Total** | **243** | **0** | **0%** |
+| **Total** | **243** | **38** | **15%** |
