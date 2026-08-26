@@ -10,44 +10,44 @@
 ## Phase 1: Foundation & Project Setup (1.5 weeks)
 
 ### 1.1 Project Initialization
-- [ ] Initialize Expo project with TypeScript template
-- [ ] Configure `tsconfig.json` with strict mode and path aliases
-- [ ] Set up ESLint + Prettier
-- [ ] Initialize Git repo, `.gitignore`, `develop`/`main` branches
-- [ ] Configure `app.json` / `app.config.ts` with metadata, splash, scheme
+- [x] Initialize Expo project with TypeScript template
+- [x] Configure `tsconfig.json` with strict mode and path aliases
+- [x] Set up ESLint + Prettier
+- [x] Initialize Git repo, `.gitignore`, `develop`/`main` branches
+- [x] Configure `app.json` / `app.config.ts` with metadata, splash, scheme
 
 ### 1.2 Navigation Architecture
-- [ ] Install React Navigation v7 (Stack + Bottom Tabs)
-- [ ] Create Auth Stack (Splash → Onboarding → Login → Register)
-- [ ] Create Main Tab Navigator (Home, Groups, Submit FAB, Leaderboard, Profile)
-- [ ] Implement center Submit tab as raised pill FAB
-- [ ] Configure deep linking for `streakpact://invite/:code`
-- [ ] Add screen transition animations
+- [x] Install React Navigation v7 (Stack + Bottom Tabs)
+- [x] Create Auth Stack (Splash → Onboarding → Login → Register)
+- [x] Create Main Tab Navigator (Home, Groups, Submit FAB, Leaderboard, Profile)
+- [x] Implement center Submit tab as raised pill FAB
+- [x] Configure deep linking for `streakpact://invite/:code`
+- [x] Add screen transition animations
 
 ### 1.3 Design System Implementation
-- [ ] Create `constants/theme.ts` with Tactile Hardware tokens (colors, drop/inset shadows)
-- [ ] Install fonts: Inter, Roboto Mono
-- [ ] Build base components: Text, Button (with physical press states), Card (pillowy), Avatar, Badge, Chip, Input
-- [ ] Build StatusIndicator component (LED states)
-- [ ] Build skeleton loader components
-- [ ] Configure Tailwind neumorphic shadow utilities
-- [ ] Build animated components: StreakCounter (digital display), XPChip, ConfettiBurst
-- [ ] Create BottomSheet reusable component
+- [x] Create `constants/theme.ts` with Tactile Hardware tokens (colors, drop/inset shadows)
+- [x] Install fonts: Inter, Roboto Mono
+- [x] Build base components: Text, Button (with physical press states), Card (pillowy), Avatar, Badge, Chip, Input
+- [x] Build StatusIndicator component (LED states)
+- [x] Build skeleton loader components
+- [x] Configure Tailwind neumorphic shadow utilities
+- [x] Build animated components: StreakCounter (digital display), XPChip, ConfettiBurst
+- [x] Create BottomSheet reusable component
 
 ### 1.4 Backend Infrastructure
-- [ ] Create Supabase project + configure env variables
-- [ ] Create Firebase project (Auth, Firestore, Cloud Messaging)
-- [ ] Create Supabase database tables (users, groups, group_members, activities, submissions, streaks, badges, user_badges)
-- [ ] Configure Row-Level Security (RLS) policies
-- [ ] Set up Supabase Storage bucket `submission-photos`
-- [ ] Create Firestore collections structure
-- [ ] Write Firestore security rules
+- [x] Create Supabase project + configure env variables
+- [x] Create Firebase project (Auth, Firestore, Cloud Messaging)
+- [x] Create Supabase database tables (users, groups, group_members, activities, submissions, streaks, badges, user_badges)
+- [x] Configure Row-Level Security (RLS) policies
+- [x] Set up Supabase Storage bucket `submission-photos`
+- [x] Create Firestore collections structure
+- [x] Write Firestore security rules
 - [ ] Set up Supabase Edge Functions project
 
 ### 1.5 State Management & Data Layer
-- [ ] Install and configure Zustand stores
-- [ ] Install TanStack Query with QueryClient config
-- [ ] Create API service layer with Supabase/Firebase clients
+- [x] Install and configure Zustand stores
+- [x] Install TanStack Query with QueryClient config
+- [x] Create API service layer with Supabase/Firebase clients
 - [ ] Set up offline submission queue (AsyncStorage)
 - [ ] Create custom hooks: useCurrentUser, useGroups, useActivities, useSubmissions, useStreaks
 
@@ -462,7 +462,7 @@
 
 | Phase | Tasks | Done | Status |
 |---|---|---|---|
-| 1. Foundation | 28 | 0 | ⬜ Not Started |
+| 1. Foundation | 28 | 25 | 🔄 In Progress |
 | 2. Auth & Onboarding | 21 | 0 | ⬜ Not Started |
 | 3. Groups & Teams | 29 | 0 | ⬜ Not Started |
 | 4. Activity System | 20 | 0 | ⬜ Not Started |
