@@ -62,7 +62,7 @@ export default function GroupSettingsScreen() {
       { 
         text: "Leave", 
         style: "destructive", 
-        onPress: () => navigation.navigate("Groups") 
+        onPress: () => navigation.navigate('Main', { screen: 'Groups' }) 
       }
     ]);
   };
@@ -73,7 +73,7 @@ export default function GroupSettingsScreen() {
       { 
         text: "Delete", 
         style: "destructive", 
-        onPress: () => navigation.navigate("Groups") 
+        onPress: () => navigation.navigate('Main', { screen: 'Groups' }) 
       }
     ]);
   };

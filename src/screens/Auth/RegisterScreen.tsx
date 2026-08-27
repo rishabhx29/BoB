@@ -6,9 +6,8 @@ import { COLORS } from '@/constants/theme';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
+import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { firebaseAuth } from '@/services/firebase';
-import { useAuthStore } from '@/store/useAuthStore';
 import * as SecureStore from 'expo-secure-store';
 
 const registerSchema = z.object({
@@ -25,7 +24,6 @@ type RegisterForm = z.infer<typeof registerSchema>;
 export default function RegisterScreen({ navigation }: any) {
   const [authError, setAuthError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const { setUser } = useAuthStore();
 
   const {
     control,
@@ -47,26 +45,11 @@ export default function RegisterScreen({ navigation }: any) {
       const userCredential = await createUserWithEmailAndPassword(firebaseAuth, data.email, data.password);
       const token = await userCredential.user.getIdToken();
       
-      // Save token and set user
+      // Save token
       await SecureStore.setItemAsync('streakpact_jwt', token);
-      setUser({
-        id: userCredential.user.uid,
-        email: userCredential.user.email || '',
-        displayName: 'New User',
-        username: 'NewUser',
-        avatarUrl: null,
-        level: 1,
-        xp: 0,
-        shieldsAvailable: 3,
-        totalSubmissions: 0,
-        longestStreak: 0,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      });
 
       // We should ideally navigate to an Avatar/Username setup screen next.
-      // But for Phase 2 basic auth, we can just go to Main.
-      navigation.reset({ index: 0, routes: [{ name: 'Main' }] });
+      navigation.replace('SetupProfile');
     } catch (error: any) {
       if (error.code === 'auth/email-already-in-use') {
         setAuthError('An account with this email already exists.');

@@ -4,7 +4,7 @@ import { Text } from '@/components/ui/Text';
 import { Button } from '@/components/ui/Button';
 import { COLORS, SIZES, SHADOWS } from '@/constants/theme';
 import { useNavigation, useRoute } from '@react-navigation/native';
-import { CameraView, Camera } from 'expo-camera';
+import { CameraView, useCameraPermissions } from 'expo-camera';
 import { z } from 'zod';
 
 const CODE_LENGTH = 6;
@@ -16,15 +16,8 @@ export default function JoinGroupScreen() {
   const [code, setCode] = useState(route.params?.code || '');
   const [error, setError] = useState('');
   const [isScanning, setIsScanning] = useState(false);
-  const [hasPermission, setHasPermission] = useState<boolean | null>(null);
+  const [permission, requestPermission] = useCameraPermissions();
   const inputRef = useRef<TextInput>(null);
-  
-  useEffect(() => {
-    (async () => {
-      const { status } = await Camera.requestCameraPermissionsAsync();
-      setHasPermission(status === 'granted');
-    })();
-  }, []);
 
   useEffect(() => {
     if (code.length === CODE_LENGTH) {
@@ -98,9 +91,10 @@ export default function JoinGroupScreen() {
   if (isScanning) {
     return (
       <View style={styles.container}>
-        {hasPermission === false ? (
+        {!permission?.granted ? (
           <View style={styles.content}>
             <Text>No access to camera</Text>
+            <Button label="Request Permission" onPress={requestPermission} style={{ marginTop: 20 }} />
             <Button label="Back" onPress={() => setIsScanning(false)} style={{ marginTop: 20 }} />
           </View>
         ) : (

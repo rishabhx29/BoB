@@ -4,7 +4,7 @@ import { Card } from '@/components/ui/Card';
 import { Text } from '@/components/ui/Text';
 import { Badge } from '@/components/ui/Badge';
 import { StackedAvatars } from './StackedAvatars';
-import { COLORS, SIZES, SHADOWS } from '@/constants/theme';
+import { COLORS, SIZES } from '@/constants/theme';
 
 export interface GroupCardProps {
   name: string;

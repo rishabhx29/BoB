@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import ENV from './env';
 
 /**
@@ -8,8 +9,12 @@ import ENV from './env';
  * - Handles file storage: submission photos (bucket: 'submission-photos')
  * - Row-Level Security (RLS) policies enforce data access rules server-side
  */
-export const supabase = createClient(ENV.SUPABASE_URL, ENV.SUPABASE_ANON_KEY, {
+const supabaseUrl = ENV.SUPABASE_URL || '';
+const supabaseAnonKey = ENV.SUPABASE_ANON_KEY || '';
+
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
+    storage: AsyncStorage,
     autoRefreshToken: true,
     persistSession: true,
     detectSessionInUrl: false, // Mobile app — no URL-based OAuth

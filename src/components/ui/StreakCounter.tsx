@@ -1,15 +1,14 @@
 import React, { useEffect } from 'react';
-import { View, StyleSheet } from 'react-native';
+import { StyleSheet } from 'react-native';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
-  withRepeat,
   withSequence,
   withTiming,
   withSpring,
   Easing,
 } from 'react-native-reanimated';
-import { COLORS, SHADOWS, SIZES } from '@/constants/theme';
+import { COLORS, SIZES } from '@/constants/theme';
 import { Text } from './Text';
 
 export interface StreakCounterProps {
