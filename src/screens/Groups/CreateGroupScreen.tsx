@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, TouchableOpacity, ScrollView, Share } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, ScrollView, Share, Alert } from 'react-native';
 import { Text } from '@/components/ui/Text';
 import { Button } from '@/components/ui/Button';
 import { COLORS, SIZES, SHADOWS } from '@/constants/theme';
 import { useNavigation } from '@react-navigation/native';
 import { Input } from '@/components/ui/Input';
 import { z } from 'zod';
+import { createGroup } from '@/services/groupService';
+import { GroupVibe, ActivitySeed } from '@/types';
 
 const step1Schema = z.object({
   groupName: z.string().min(1, 'Group name is required').max(30, 'Max 30 characters'),
@@ -52,10 +54,8 @@ export default function CreateGroupScreen() {
   const [goalError, setGoalError] = useState('');
   
   const [inviteCode, setInviteCode] = useState('');
-
-  useEffect(() => {
-    setInviteCode(generateSafeCode());
-  }, []);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [createdGroupId, setCreatedGroupId] = useState<string | null>(null);
 
   const handleNext = () => {
     if (step === 1) {
@@ -74,12 +74,46 @@ export default function CreateGroupScreen() {
         return;
       }
       setGoalError('');
+      
+      setIsSubmitting(true);
+      
+      const templates: ActivitySeed[] = selectedActivities.map(id => {
+        const act = ACTIVITIES.find(a => a.id === id)!;
+        return {
+          name: act.name,
+          icon: act.emoji,
+          color: COLORS.brandPrimary,
+          frequency: 'daily',
+          frequencyDays: [0, 1, 2, 3, 4, 5, 6],
+          requirePhoto: false
+        };
+      });
+
+      createGroup({
+        name: groupName,
+        emoji,
+        vibe: selectedVibe as GroupVibe,
+        goalDescription: goal || null
+      }, templates).then(group => {
+        setIsSubmitting(false);
+        setInviteCode(group.inviteCode);
+        setCreatedGroupId(group.id);
+        setStep(5);
+      }).catch(err => {
+        setIsSubmitting(false);
+        Alert.alert('Error', err.message || 'Failed to create group');
+      });
+      return;
     }
 
     if (step < 5) {
       setStep(step + 1);
     } else {
-      navigation.replace('GroupHome', { groupId: 'new-group' });
+      if (createdGroupId) {
+        navigation.replace('GroupHome', { groupId: createdGroupId });
+      } else {
+        navigation.goBack();
+      }
     }
   };
 
@@ -254,7 +288,11 @@ export default function CreateGroupScreen() {
       </ScrollView>
 
       <View style={styles.footer}>
-        <Button label="Create Group" onPress={handleNext} />
+        <Button 
+          label={isSubmitting ? "Creating..." : (step === 5 ? "Enter Pact" : step === 4 ? "Create Group" : "Next")} 
+          onPress={handleNext} 
+          disabled={isSubmitting} 
+        />
       </View>
     </View>
   );

@@ -109,8 +109,8 @@
 - [x] Step 3: Set group "vibe" (optional)
 - [x] Step 4: Group goal description (optional)
 - [x] Step 5: Invite screen (code + link + QR)
-- [ ] Store group in Supabase, assign ADMIN role
-- [ ] Invite code generation with collision retry
+- [x] Store group in Supabase, assign ADMIN role
+- [x] Invite code generation with collision retry
 
 ### 3.3 Join Group Flow
 - [x] Manual code entry (segmented 6-char input)
@@ -119,7 +119,7 @@
 - [x] Validate invite code
 - [x] Check group capacity (max 6)
 - [x] "Group is full" error handling
-- [ ] Add to group_members, trigger notification
+- [x] Add to group_members, trigger notification
 
 ### 3.4 Group Home Screen
 - [x] Header: group info + member avatars + group streak
@@ -464,7 +464,7 @@
 |---|---|---|---|
 | 1. Foundation | 32 | 30 | [/] In Progress |
 | 2. Auth & Onboarding | 24 | 20 | [/] In Progress |
-| 3. Groups & Teams | 38 | 35 | [/] In Progress |
+| 3. Groups & Teams | 38 | 38 | [x] Completed |
 | 4. Activity System | 20 | 0 | ⬜ Not Started |
 | 5. Submissions | 24 | 0 | ⬜ Not Started |
 | 6. Calendar & Streaks | 24 | 0 | ⬜ Not Started |
