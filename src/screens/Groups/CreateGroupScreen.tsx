@@ -1,16 +1,29 @@
 import React, { useState } from 'react';
 import { View, StyleSheet, TouchableOpacity, ScrollView, Share, Alert } from 'react-native';
-import { Text } from '@/components/ui/Text';
-import { Button } from '@/components/ui/Button';
-import { COLORS, SIZES, SHADOWS } from '@/constants/theme';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { Text, Input, Button, Icon, IconName, VoltMark } from '@/components/ui';
+import { COLORS, RADIUS, SHADOWS, SPACE } from '@/constants/theme';
 import { useNavigation } from '@react-navigation/native';
-import { Input } from '@/components/ui/Input';
 import { z } from 'zod';
 import { createGroup } from '@/services/groupService';
 import { GroupVibe, ActivitySeed } from '@/types';
 import { PRESET_ACTIVITIES } from '@/constants/activityTemplates';
 import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
+
+const EMOJI_LIST: IconName[] = ['lightning', 'flame', 'crown', 'target', 'rocket', 'star', 'sparkle', 'medal', 'trophy', 'fire', 'book', 'barbell'];
+const VIBE_ICONS: Record<string, IconName> = { hardcore: 'flame', relaxed: 'leaf' };
+const ACTIVITY_ICONS: Record<string, IconName> = {
+  gym: 'barbell',
+  study: 'book',
+  read: 'book',
+  run: 'rocket',
+  meditate: 'leaf',
+  water: 'drop',
+  code: 'code',
+  sleep: 'moon',
+  music: 'music-notes',
+};
 
 const step1Schema = z.object({
   groupName: z.string().min(1, 'Group name is required').max(30, 'Max 30 characters'),
@@ -20,11 +33,9 @@ const step4Schema = z.object({
   goal: z.string().max(200, 'Max 200 characters').optional(),
 });
 
-const EMOJI_LIST = ['⚡', '🔥', '💪', '🚀', '🎯', '🏆', '💎', '🌟', '🧘', '🎧', '🥑', '📚'];
-
 const VIBES = [
-  { id: 'hardcore', emoji: '🔥', title: 'Hardcore', desc: 'Miss a day and the group streak dies. True accountability.' },
-  { id: 'relaxed', emoji: '🏖️', title: 'Relaxed', desc: 'Skip days allowed, individual streaks preserved.' },
+  { id: 'hardcore', title: 'Hardcore', desc: 'Miss a day and the group streak dies. True accountability.' },
+  { id: 'relaxed', title: 'Relaxed', desc: 'Skip days allowed, individual streaks preserved.' },
 ];
 
 const generateSafeCode = () => {
@@ -41,8 +52,8 @@ export default function CreateGroupScreen() {
   const [step, setStep] = useState(1);
   const [groupName, setGroupName] = useState('');
   const [groupNameError, setGroupNameError] = useState('');
-  const [emoji, setEmoji] = useState('⚡');
-  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [icon, setIcon] = useState<IconName>('lightning');
+  const [showIconPicker, setShowIconPicker] = useState(false);
   
   const [selectedActivities, setSelectedActivities] = useState<string[]>(['gym']);
   const [activityError, setActivityError] = useState('');
@@ -104,7 +115,7 @@ export default function CreateGroupScreen() {
 
       createGroup({
         name: groupName,
-        emoji,
+        emoji: icon,
         vibe: selectedVibe as GroupVibe,
         goalDescription: goal || null
       }, templates).then(group => {
@@ -128,7 +139,7 @@ export default function CreateGroupScreen() {
       setStep(step + 1);
     } else {
       if (createdGroupId) {
-        navigation.replace('GroupHome', { groupId: createdGroupId, groupName, groupEmoji: emoji });
+        navigation.replace('GroupHome', { groupId: createdGroupId, groupName, groupEmoji: icon });
       } else {
         navigation.goBack();
       }
@@ -183,13 +194,13 @@ export default function CreateGroupScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => step > 1 ? setStep(step - 1) : navigation.goBack()} style={styles.backBtn}>
-          <Text variant="headingMd">← Back</Text>
+          <Icon name="arrow-left" size={20} color={COLORS.inkDisplay} />
         </TouchableOpacity>
-        <Text variant="headingMd">Step {step} of 5</Text>
-        <View style={{ width: 60 }} />
+        <Text variant="eyebrow" color={COLORS.inkSecondary}>Step {step} of 5</Text>
+        <View style={{ width: 40 }} />
       </View>
 
       {/* Hardware Progress Bar */}
@@ -200,42 +211,43 @@ export default function CreateGroupScreen() {
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         {step === 1 && (
           <View style={styles.stepContainer}>
-            <Text variant="headingLg" style={styles.title}>Name your Pact</Text>
-            <Text style={styles.subtitle}>Make it something motivating.</Text>
-            
-            <View style={styles.emojiSection}>
-              <TouchableOpacity 
-                style={showEmojiPicker ? [styles.emojiPicker, styles.cardInset] : [styles.emojiPicker, styles.cardOutset]} 
+            <Text variant="eyebrow" color={COLORS.inkSecondary} style={styles.eyebrow}>Step 1</Text>
+            <Text variant="displaySm" color={COLORS.inkDisplay} style={styles.title}>Name your pact</Text>
+            <Text variant="body" color={COLORS.inkSecondary} style={styles.subtitle}>Make it something motivating.</Text>
+
+            <View style={styles.iconSection}>
+              <TouchableOpacity
+                style={showIconPicker ? [styles.iconPicker, styles.cardInset] : [styles.iconPicker, styles.cardOutset]}
                 onPress={() => {
                   try { Haptics.selectionAsync(); } catch {}
-                  setShowEmojiPicker(!showEmojiPicker);
+                  setShowIconPicker(!showIconPicker);
                 }}
                 activeOpacity={0.7}
               >
-                <Text style={styles.emojiText}>{emoji}</Text>
+                <Icon name={icon} size={36} color={COLORS.accent} bold />
               </TouchableOpacity>
-              
-              {showEmojiPicker && (
-                <View style={styles.emojiDropdown}>
+
+              {showIconPicker && (
+                <View style={styles.iconDropdown}>
                   {EMOJI_LIST.map(e => (
-                    <TouchableOpacity 
-                      key={e} 
-                      style={[styles.emojiOption, e === emoji && styles.emojiOptionSelected]}
-                      onPress={() => { 
+                    <TouchableOpacity
+                      key={e}
+                      style={[styles.iconOption, e === icon && styles.iconOptionSelected]}
+                      onPress={() => {
                         try { Haptics.selectionAsync(); } catch {}
-                        setEmoji(e); 
-                        setShowEmojiPicker(false); 
+                        setIcon(e);
+                        setShowIconPicker(false);
                       }}
                     >
-                      <Text style={styles.emojiOptionText}>{e}</Text>
+                      <Icon name={e} size={22} color={e === icon ? COLORS.accent : COLORS.inkPrimary} bold={e === icon} />
                     </TouchableOpacity>
                   ))}
                 </View>
               )}
             </View>
 
-            <Input 
-              label="Group Name" 
+            <Input
+              label="Group name"
               placeholder="e.g. Morning Warriors"
               value={groupName}
               onChangeText={(txt) => { setGroupName(txt); if(groupNameError) setGroupNameError(''); }}
@@ -244,31 +256,40 @@ export default function CreateGroupScreen() {
             />
           </View>
         )}
-        
+
         {step === 2 && (
           <View style={styles.stepContainer}>
-            <Text variant="headingLg" style={styles.title}>Choose Activities</Text>
-            <Text style={styles.subtitle}>Select the habits you want to track together ({selectedActivities.length} selected).</Text>
-            
+            <Text variant="eyebrow" color={COLORS.inkSecondary} style={styles.eyebrow}>Step 2</Text>
+            <Text variant="displaySm" color={COLORS.inkDisplay} style={styles.title}>Choose activities</Text>
+            <Text variant="body" color={COLORS.inkSecondary} style={styles.subtitle}>
+              Select the habits you want to track ({selectedActivities.length} chosen).
+            </Text>
+
             {activityError ? (
-              <Text variant="caption" style={{ color: COLORS.danger, marginBottom: 12 }}>
+              <Text variant="caption" color={COLORS.danger} style={styles.fieldError}>
                 {activityError}
               </Text>
             ) : null}
 
             {PRESET_ACTIVITIES.map((act) => {
               const isSelected = selectedActivities.includes(act.id);
+              const actIcon = ACTIVITY_ICONS[act.id] || 'target';
               return (
-                <TouchableOpacity 
+                <TouchableOpacity
                   key={act.id}
                   style={renderCardStyle(isSelected)}
                   onPress={() => toggleActivity(act.id)}
-                  activeOpacity={0.8}
+                  activeOpacity={0.85}
                 >
-                  <Text style={styles.presetEmoji}>{act.icon}</Text>
+                  <View style={[styles.actIconBox, { backgroundColor: hexToTint(act.color, 0.14) }]}>
+                    <Icon name={actIcon} size={22} color={act.color} />
+                  </View>
                   <View style={{ flex: 1 }}>
-                    <Text variant="headingMd" style={isSelected && styles.textSelected}>{act.name}</Text>
-                    <Text variant="caption" color={COLORS.textSecondary}>{act.description}</Text>
+                    <Text variant="headingMd" color={isSelected ? COLORS.accent : COLORS.inkDisplay}>{act.name}</Text>
+                    <Text variant="caption" color={COLORS.inkSecondary}>{act.description}</Text>
+                  </View>
+                  <View style={[styles.checkBox, isSelected ? styles.checkBoxActive : null]}>
+                    {isSelected && <Icon name="check" size={14} color="#FFFFFF" bold />}
                   </View>
                 </TouchableOpacity>
               );
@@ -278,25 +299,29 @@ export default function CreateGroupScreen() {
 
         {step === 3 && (
           <View style={styles.stepContainer}>
-            <Text variant="headingLg" style={styles.title}>Set the Vibe</Text>
-            <Text style={styles.subtitle}>How strict is this pact?</Text>
-            
+            <Text variant="eyebrow" color={COLORS.inkSecondary} style={styles.eyebrow}>Step 3</Text>
+            <Text variant="displaySm" color={COLORS.inkDisplay} style={styles.title}>Set the vibe</Text>
+            <Text variant="body" color={COLORS.inkSecondary} style={styles.subtitle}>How strict is this pact?</Text>
+
             {VIBES.map((vibe) => {
               const isSelected = selectedVibe === vibe.id;
+              const vibeIcon = VIBE_ICONS[vibe.id] || 'target';
               return (
-                <TouchableOpacity 
+                <TouchableOpacity
                   key={vibe.id}
                   style={renderCardStyle(isSelected)}
                   onPress={() => {
                     try { Haptics.selectionAsync(); } catch {}
                     setSelectedVibe(vibe.id);
                   }}
-                  activeOpacity={0.8}
+                  activeOpacity={0.85}
                 >
-                  <Text style={styles.presetEmoji}>{vibe.emoji}</Text>
+                  <View style={[styles.actIconBox, { backgroundColor: vibe.id === 'hardcore' ? COLORS.accentTint : COLORS.positiveTint }]}>
+                    <Icon name={vibeIcon} size={22} color={vibe.id === 'hardcore' ? COLORS.accent : COLORS.positive} />
+                  </View>
                   <View style={{ flex: 1 }}>
-                    <Text variant="headingMd" style={isSelected && styles.textSelected}>{vibe.title}</Text>
-                    <Text variant="caption" color={COLORS.textSecondary}>{vibe.desc}</Text>
+                    <Text variant="headingMd" color={isSelected ? COLORS.accent : COLORS.inkDisplay}>{vibe.title}</Text>
+                    <Text variant="caption" color={COLORS.inkSecondary}>{vibe.desc}</Text>
                   </View>
                 </TouchableOpacity>
               );
@@ -306,11 +331,12 @@ export default function CreateGroupScreen() {
 
         {step === 4 && (
           <View style={styles.stepContainer}>
-            <Text variant="headingLg" style={styles.title}>Group Goal</Text>
-            <Text style={styles.subtitle}>What are we working towards? (Optional)</Text>
-            
-            <Input 
-              label="Goal Description" 
+            <Text variant="eyebrow" color={COLORS.inkSecondary} style={styles.eyebrow}>Step 4</Text>
+            <Text variant="displaySm" color={COLORS.inkDisplay} style={styles.title}>Group goal</Text>
+            <Text variant="body" color={COLORS.inkSecondary} style={styles.subtitle}>What are you working toward? (Optional)</Text>
+
+            <Input
+              label="Goal"
               placeholder="e.g. Read 50 books this year"
               multiline
               numberOfLines={4}
@@ -318,177 +344,153 @@ export default function CreateGroupScreen() {
               onChangeText={(txt) => { setGoal(txt); if(goalError) setGoalError(''); }}
               error={goalError}
               maxLength={200}
-              style={{ height: 100, textAlignVertical: 'top' }}
+              style={{ minHeight: 100, textAlignVertical: 'top' }}
             />
           </View>
         )}
 
         {step === 5 && (
           <View style={styles.stepContainer}>
-            <Text variant="headingLg" style={styles.title}>Invite Friends</Text>
-            <Text style={styles.subtitle}>Share this code or link with your friends to join.</Text>
-            
-            <TouchableOpacity 
-              style={[styles.codeContainer, styles.cardInset]}
+            <Text variant="eyebrow" color={COLORS.inkSecondary} style={styles.eyebrow}>Step 5</Text>
+            <Text variant="displaySm" color={COLORS.inkDisplay} style={styles.title}>Invite friends</Text>
+            <Text variant="body" color={COLORS.inkSecondary} style={styles.subtitle}>Share this code with your friends.</Text>
+
+            <TouchableOpacity
+              style={styles.codeContainer}
               onPress={handleCopyCode}
-              activeOpacity={0.8}
+              activeOpacity={0.85}
             >
-              <Text variant="caption" style={styles.codeLabel}>
-                {copiedCode ? '✓ COPIED TO CLIPBOARD' : 'TAP CODE TO COPY'}
+              <Text variant="caption" color={COLORS.inkSecondary} style={styles.codeLabel}>
+                {copiedCode ? 'COPIED TO CLIPBOARD' : 'TAP CODE TO COPY'}
               </Text>
               <Text style={styles.codeDisplay}>{inviteCode}</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity 
-              style={[styles.presetCard, styles.cardOutset, { justifyContent: 'center' }]} 
+            <Button
+              label="Share invite link"
+              variant="secondary"
+              leadingIcon="share-network"
               onPress={handleShare}
-            >
-              <Text variant="headingMd" color={COLORS.brandPrimary}>Share Invite Link 🔗</Text>
-            </TouchableOpacity>
+              fullWidth
+              size="lg"
+            />
           </View>
         )}
       </ScrollView>
 
       <View style={styles.footer}>
-        <Button 
-          label={isSubmitting ? "Creating..." : (step === 5 ? "Enter Pact 🚀" : step === 4 ? "Create Group 🔥" : "Next")} 
-          onPress={handleNext} 
-          disabled={isSubmitting} 
+        <Button
+          label={isSubmitting ? 'Creating…' : (step === 5 ? 'Enter pact' : step === 4 ? 'Create group' : 'Next')}
+          onPress={handleNext}
+          disabled={isSubmitting}
+          fullWidth
+          size="lg"
+          trailingIcon={step === 5 ? 'arrow-right' : step === 4 ? 'sparkle' : 'arrow-right'}
         />
       </View>
-    </View>
+    </SafeAreaView>
   );
 }
 
+function hexToTint(hex: string, alpha: number) {
+  const h = hex.replace('#', '');
+  const r = parseInt(h.substring(0, 2), 16);
+  const g = parseInt(h.substring(2, 4), 16);
+  const b = parseInt(h.substring(4, 6), 16);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.surfaceBase,
-  },
+  container: { flex: 1, backgroundColor: COLORS.surfaceBase },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingTop: 60,
-    paddingHorizontal: SIZES.padding,
-    paddingBottom: 20,
+    paddingHorizontal: SPACE.xl,
+    paddingTop: 12,
+    paddingBottom: 16,
   },
   backBtn: {
-    padding: 8,
-    marginLeft: -8,
+    width: 40, height: 40, borderRadius: 20,
+    backgroundColor: COLORS.surfaceElevated,
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: COLORS.hairline,
   },
   progressBarBg: {
-    height: 4,
-    backgroundColor: COLORS.surfaceDark,
-    width: '100%',
+    height: 4, backgroundColor: COLORS.surfaceSunken, width: '100%',
   },
-  progressBarFill: {
-    height: '100%',
-    backgroundColor: COLORS.brandPrimary,
+  progressBarFill: { height: '100%', backgroundColor: COLORS.accent },
+  content: { padding: SPACE.xl, paddingBottom: 120 },
+  stepContainer: { flex: 1 },
+  eyebrow: { marginBottom: 6 },
+  title: { marginBottom: 8 },
+  subtitle: { lineHeight: 22, marginBottom: 24 },
+  fieldError: { marginBottom: 12 },
+  iconSection: { alignItems: 'center', marginVertical: 24, zIndex: 10 },
+  iconPicker: {
+    width: 84, height: 84, borderRadius: RADIUS.lg,
+    justifyContent: 'center', alignItems: 'center',
+    backgroundColor: COLORS.surfaceElevated,
+    borderWidth: 1, borderColor: COLORS.hairline,
   },
-  content: {
-    padding: SIZES.padding,
-  },
-  stepContainer: {
-    flex: 1,
-  },
-  title: {
-    marginBottom: 8,
-  },
-  subtitle: {
-    color: COLORS.textSecondary,
-    marginBottom: 24,
-  },
-  emojiSection: {
-    alignItems: 'center',
-    marginVertical: 24,
-    zIndex: 10,
-  },
-  emojiPicker: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  emojiText: {
-    fontSize: 40,
-  },
-  emojiDropdown: {
+  iconDropdown: {
     position: 'absolute',
-    top: 90,
-    backgroundColor: COLORS.surfaceBase,
+    top: 96,
+    backgroundColor: COLORS.surfaceElevated,
     padding: 12,
-    borderRadius: 24,
+    borderRadius: RADIUS.lg,
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'center',
     width: '100%',
-    ...SHADOWS.mediumElevation,
+    borderWidth: 1, borderColor: COLORS.hairline,
+    ...SHADOWS.raised,
   },
-  emojiOption: {
-    width: 50,
-    height: 50,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderRadius: 25,
-    margin: 4,
+  iconOption: {
+    width: 44, height: 44, justifyContent: 'center', alignItems: 'center',
+    borderRadius: RADIUS.md, margin: 4,
   },
-  emojiOptionSelected: {
-    backgroundColor: COLORS.surfaceDark,
-  },
-  emojiOptionText: {
-    fontSize: 28,
-  },
+  iconOptionSelected: { backgroundColor: COLORS.accentTint },
   presetCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 20,
-    borderRadius: 20,
-    marginBottom: 16,
+    flexDirection: 'row', alignItems: 'center',
+    padding: 18, borderRadius: RADIUS.lg, marginBottom: 12, gap: 14,
+    borderWidth: 1, borderColor: COLORS.hairline,
   },
   cardOutset: {
-    backgroundColor: COLORS.surfaceBase,
-    ...SHADOWS.softElevation,
+    backgroundColor: COLORS.surfaceElevated,
   },
   cardInset: {
-    backgroundColor: COLORS.surfaceDark,
-    borderColor: 'rgba(0,0,0,0.05)',
-    borderWidth: 1,
-    transform: [{ translateY: 2 }],
+    backgroundColor: COLORS.surfaceSunken,
+    borderColor: COLORS.accent,
   },
-  textSelected: {
-    color: COLORS.brandPrimary,
+  actIconBox: {
+    width: 44, height: 44, borderRadius: RADIUS.md,
+    alignItems: 'center', justifyContent: 'center',
   },
-  customCard: {
-    borderStyle: 'dashed',
-    borderWidth: 2,
-    borderColor: COLORS.surfaceDark,
-    backgroundColor: 'transparent',
-    justifyContent: 'center',
+  checkBox: {
+    width: 22, height: 22, borderRadius: 11,
+    borderWidth: 1.5, borderColor: COLORS.hairlineStrong,
+    alignItems: 'center', justifyContent: 'center',
   },
-  presetEmoji: {
-    fontSize: 32,
-    marginRight: 16,
+  checkBoxActive: {
+    backgroundColor: COLORS.accent, borderColor: COLORS.accent,
   },
   codeContainer: {
-    padding: 32,
-    borderRadius: 24,
-    alignItems: 'center',
-    marginBottom: 32,
+    padding: 28, borderRadius: RADIUS.lg,
+    alignItems: 'center', marginBottom: 16,
+    backgroundColor: COLORS.surfaceSunken,
+    borderWidth: 1, borderColor: COLORS.hairline,
   },
-  codeLabel: {
-    marginBottom: 12,
-    letterSpacing: 2,
-  },
+  codeLabel: { marginBottom: 12, letterSpacing: 2 },
   codeDisplay: {
-    fontFamily: 'RobotoMono-Bold',
-    fontSize: 48,
-    color: COLORS.textDisplay,
+    fontFamily: 'JetBrainsMono-Bold',
+    fontSize: 40,
+    color: COLORS.inkDisplay,
     letterSpacing: 8,
   },
   footer: {
-    padding: SIZES.padding,
-    paddingBottom: 40,
+    padding: SPACE.xl, paddingBottom: 36,
+    borderTopWidth: 1, borderTopColor: COLORS.hairline,
+    backgroundColor: COLORS.surfaceBase,
   },
 });

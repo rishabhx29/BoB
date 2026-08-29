@@ -1,136 +1,153 @@
-import React, { useRef } from 'react';
-import { Pressable, View, StyleSheet, Animated } from 'react-native';
+import React, { useCallback } from 'react';
+import { Pressable, View, StyleSheet } from 'react-native';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+  interpolate,
+} from 'react-native-reanimated';
 import { Card } from '@/components/ui/Card';
 import { Text } from '@/components/ui/Text';
 import { Badge } from '@/components/ui/Badge';
+import { Icon, IconName } from '@/components/ui/Icon';
 import { StackedAvatars } from './StackedAvatars';
-import { COLORS, SIZES } from '@/constants/theme';
+import { COLORS, RADIUS, SHADOWS } from '@/constants/theme';
 
 export interface GroupCardProps {
+  id: string;
   name: string;
-  emoji: string;
-  avatars: (any | null)[];
+  icon: IconName;
+  iconColor: string;
+  members: Array<{ avatarUrl?: string | null; displayName?: string }>;
   activitiesCount: number;
   allSubmitted: boolean;
+  streakDays: number;
   onPress: () => void;
   onLongPress?: () => void;
 }
 
-export function GroupCard({ 
-  name, 
-  emoji, 
-  avatars, 
-  activitiesCount, 
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+
+export function GroupCard({
+  name,
+  icon,
+  iconColor,
+  members,
+  activitiesCount,
   allSubmitted,
+  streakDays,
   onPress,
-  onLongPress
+  onLongPress,
 }: GroupCardProps) {
-  const translateY = useRef(new Animated.Value(0)).current;
-  const scale = useRef(new Animated.Value(1)).current;
+  const press = useSharedValue(0);
 
-  const handlePressIn = () => {
-    Animated.parallel([
-      Animated.spring(translateY, {
-        toValue: 2,
-        useNativeDriver: true,
-        speed: 50,
-      }),
-      Animated.spring(scale, {
-        toValue: 0.98,
-        useNativeDriver: true,
-        speed: 50,
-      })
-    ]).start();
-  };
+  const handlePressIn = useCallback(() => {
+    press.value = withSpring(1, { damping: 22, stiffness: 320 });
+  }, [press]);
 
-  const handlePressOut = () => {
-    Animated.parallel([
-      Animated.spring(translateY, {
-        toValue: 0,
-        useNativeDriver: true,
-        speed: 50,
-      }),
-      Animated.spring(scale, {
-        toValue: 1,
-        useNativeDriver: true,
-        speed: 50,
-      })
-    ]).start();
-  };
+  const handlePressOut = useCallback(() => {
+    press.value = withSpring(0, { damping: 22, stiffness: 320 });
+  }, [press]);
+
+  const animStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: interpolate(press.value, [0, 1], [1, 0.985]) }],
+  }));
 
   return (
-    <Animated.View style={[styles.touchable, { transform: [{ translateY }, { scale }] }]}>
-      <Pressable 
-        onPress={onPress}
-        onLongPress={onLongPress}
-        onPressIn={handlePressIn}
-        onPressOut={handlePressOut}
-        delayLongPress={500}
-      >
-        <Card padding={20} elevation="medium">
-          <View style={styles.headerRow}>
-            <View style={styles.titleContainer}>
-              <Text style={styles.emoji}>{emoji}</Text>
-              <Text variant="headingMd" style={styles.title} numberOfLines={1}>
-                {name}
-              </Text>
-            </View>
-            <Badge 
-              label={allSubmitted ? 'Done Today' : 'Pending'} 
-              variant={allSubmitted ? 'success' : 'default'} 
-            />
+    <AnimatedPressable
+      onPress={onPress}
+      onLongPress={onLongPress}
+      onPressIn={handlePressIn}
+      onPressOut={handlePressOut}
+      delayLongPress={400}
+      style={animStyle}
+    >
+      <Card variant="elevated" padding="lg">
+        {/* Header row */}
+        <View style={styles.headerRow}>
+          <View style={[styles.iconBox, { backgroundColor: hexToTint(iconColor) }]}>
+            <Icon name={icon} size={24} color={iconColor} />
           </View>
+          <View style={styles.titleArea}>
+            <Text variant="headingMd" color={COLORS.inkDisplay} numberOfLines={1}>
+              {name}
+            </Text>
+            <Text variant="caption" color={COLORS.inkSecondary}>
+              {activitiesCount} {activitiesCount === 1 ? 'activity' : 'activities'}
+            </Text>
+          </View>
+          <View style={styles.statusCol}>
+            {allSubmitted ? (
+              <Badge label="All done" icon="check-circle" variant="positive" />
+            ) : (
+              <Badge label="In progress" variant="neutral" />
+            )}
+          </View>
+        </View>
 
-          <View style={styles.footerRow}>
-            <StackedAvatars avatars={avatars} size={32} max={4} />
-            
-            <View style={styles.activitiesContainer}>
-              <Text variant="caption" style={styles.activitiesText}>
-                {activitiesCount} {activitiesCount === 1 ? 'Activity' : 'Activities'}
-              </Text>
-            </View>
+        {/* Footer row */}
+        <View style={styles.footerRow}>
+          <StackedAvatars
+            avatars={members.map(m => m.avatarUrl ?? null)}
+            names={members.map(m => m.displayName ?? 'Member')}
+            max={4}
+            size={28}
+          />
+          <View style={styles.streakPill}>
+            <Icon name="flame" size={14} color={COLORS.accent} />
+            <Text variant="numericSm" color={COLORS.inkDisplay}>
+              {streakDays}
+            </Text>
+            <Text variant="caption" color={COLORS.inkTertiary}>d</Text>
           </View>
-        </Card>
-      </Pressable>
-    </Animated.View>
+        </View>
+      </Card>
+    </AnimatedPressable>
   );
 }
 
+function hexToTint(hex: string, alpha: number = 0.12) {
+  const h = hex.replace('#', '');
+  const r = parseInt(h.substring(0, 2), 16);
+  const g = parseInt(h.substring(2, 4), 16);
+  const b = parseInt(h.substring(4, 6), 16);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
 const styles = StyleSheet.create({
-  touchable: {
-    marginBottom: 16,
-  },
   headerRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    gap: 14,
     marginBottom: 16,
   },
-  titleContainer: {
-    flexDirection: 'row',
+  iconBox: {
+    width: 48,
+    height: 48,
+    borderRadius: RADIUS.md,
     alignItems: 'center',
-    flex: 1,
-    marginRight: 8,
+    justifyContent: 'center',
   },
-  emoji: {
-    fontSize: 24,
-    marginRight: 12,
-  },
-  title: {
+  titleArea: {
     flex: 1,
+  },
+  statusCol: {
+    alignItems: 'flex-end',
   },
   footerRow: {
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    alignItems: 'flex-end',
   },
-  activitiesContainer: {
-    backgroundColor: COLORS.surfaceDark,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: SIZES.radiusPill,
+  streakPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.surfaceSunken,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: RADIUS.pill,
+    gap: 4,
   },
-  activitiesText: {
-    color: COLORS.textPrimary,
-  }
 });
+
+export default GroupCard;

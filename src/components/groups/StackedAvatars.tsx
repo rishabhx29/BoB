@@ -2,45 +2,52 @@ import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import { Avatar } from '@/components/ui/Avatar';
 import { Text } from '@/components/ui/Text';
-import { COLORS, SHADOWS } from '@/constants/theme';
+import { COLORS } from '@/constants/theme';
 
 interface StackedAvatarsProps {
-  avatars: (any | null)[];
+  avatars: Array<string | null | undefined>;
+  names?: string[];
   max?: number;
   size?: number;
 }
 
-export function StackedAvatars({ avatars, max = 3, size = 32 }: StackedAvatarsProps) {
-  const displayAvatars = avatars.slice(0, max);
-  const remaining = avatars.length - max;
+export function StackedAvatars({ avatars, names = [], max = 3, size = 32 }: StackedAvatarsProps) {
+  const display = avatars.slice(0, max);
+  const remaining = Math.max(0, avatars.length - max);
 
   return (
     <View style={styles.container}>
-      {displayAvatars.map((source, index) => (
-        <View 
-          key={index} 
+      {display.map((a, i) => (
+        <View
+          key={i}
           style={[
-            styles.avatarContainer, 
-            { marginLeft: index === 0 ? 0 : -size / 3 }
+            styles.avatarWrap,
+            { marginLeft: i === 0 ? 0 : -(size * 0.32) },
           ]}
         >
-          <Avatar source={source} size={size} />
+          <Avatar
+            src={a ?? undefined}
+            name={names[i]}
+            size={size}
+            ring
+          />
         </View>
       ))}
       {remaining > 0 && (
-        <View 
+        <View
           style={[
-            styles.avatarContainer, 
             styles.moreContainer,
-            { 
-              width: size, 
-              height: size, 
+            {
+              width: size,
+              height: size,
               borderRadius: size / 2,
-              marginLeft: -size / 3 
-            }
+              marginLeft: -(size * 0.32),
+              borderWidth: 2,
+              borderColor: COLORS.surfaceBase,
+            },
           ]}
         >
-          <Text variant="caption" style={{ color: COLORS.surfaceScreen }}>
+          <Text variant="numericSm" color={COLORS.inkDisplay}>
             +{remaining}
           </Text>
         </View>
@@ -54,15 +61,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
-  avatarContainer: {
-    borderWidth: 2,
-    borderColor: COLORS.surfaceBase,
-    borderRadius: 999,
-    ...SHADOWS.softElevation,
+  avatarWrap: {
+    // overlap handled by margin
   },
   moreContainer: {
-    backgroundColor: COLORS.surfaceDark,
-    justifyContent: 'center',
+    backgroundColor: COLORS.surfaceSunken,
     alignItems: 'center',
-  }
+    justifyContent: 'center',
+  },
 });
+
+export default StackedAvatars;

@@ -191,8 +191,8 @@ const styles = StyleSheet.create({
     color: COLORS.textPrimary,
   },
   codeContainer: {
-    backgroundColor: COLORS.surfaceScreen,
-    borderRadius: SIZES.radiusCard,
+    backgroundColor: COLORS.surfaceSunken,
+    borderRadius: 20,
     padding: 24,
     alignItems: 'center',
     justifyContent: 'center',
