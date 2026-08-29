@@ -1,47 +1,79 @@
 # Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
 
-# dependencies
+# Dependencies
 node_modules/
+.pnp
+.pnp.js
 
-# Expo
-.expo/
-dist/
-web-build/
-expo-env.d.ts
-
-# Native
-.kotlin/
-*.orig.*
+# Environment & Sensitive Files
+.env
+.env.*
+!.env.example
+*.env
+*.pem
+*.key
+*.cert
 *.jks
 *.p8
 *.p12
-*.key
+*.keystore
 *.mobileprovision
+google-services.json
+GoogleService-Info.plist
 
-# Metro
-.metro-health-check*
+# Expo & Build outputs
+.expo/
+.expo-shared/
+dist/
+web-build/
+build/
+expo-env.d.ts
 
-# debug
-npm-debug.*
-yarn-debug.*
-yarn-error.*
-
-# macOS
-.DS_Store
-*.pem
-
-# local env files
-.env
-.env*.local
-
-# typescript
-*.tsbuildinfo
-
-# generated native folders
+# Native builds & caches
 /ios
 /android
+.kotlin/
+.gradle/
+*.orig.*
 
-# user requests
+# Metro & Bundler
+.metro-health-check*
+.metro-cache/
+
+# Logs & Debug dumps
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# TypeScript
+*.tsbuildinfo
+
+# IDE & Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+*.sublime-project
+*.sublime-workspace
+
+# OS files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Desktop.ini
+
+# Testing & Coverage
+coverage/
+.nyc_output/
+
+# User requests / Agent artifacts
 .agents/
 required/
 Required/
