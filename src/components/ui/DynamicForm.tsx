@@ -30,7 +30,7 @@ const generateSchema = (fields: FieldDefinition[]) => {
         }
         break;
       case 'number':
-        fieldSchema = z.coerce.number({ invalid_type_error: 'Must be a number' });
+        fieldSchema = z.coerce.number();
         if (!f.required) fieldSchema = fieldSchema.optional();
         break;
       case 'multiselect':

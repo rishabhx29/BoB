@@ -14,13 +14,14 @@ import { Text } from './Text';
 export interface StreakCounterProps {
   count: number;
   label?: string;
+  size?: 'small' | 'medium' | 'large';
 }
 
 /**
  * A neumorphic "digital display" component showing the streak number.
  * Looks like an LCD screen embedded in the hardware card.
  */
-export function StreakCounter({ count, label = 'DAY STREAK' }: StreakCounterProps) {
+export function StreakCounter({ count, label = 'DAY STREAK', size = 'medium' }: StreakCounterProps) {
   const scale = useSharedValue(1);
 
   // Pulse animation whenever count changes
@@ -35,12 +36,18 @@ export function StreakCounter({ count, label = 'DAY STREAK' }: StreakCounterProp
     transform: [{ scale: scale.value }],
   }));
 
+  const isSmall = size === 'small';
+
   return (
-    <Animated.View style={[styles.screen, animatedStyle]}>
-      <Text variant="digitalDisplay" style={styles.count}>
+    <Animated.View style={[
+      styles.screen, 
+      isSmall && { paddingHorizontal: 8, paddingVertical: 6 },
+      animatedStyle
+    ]}>
+      <Text variant="digitalDisplay" style={[styles.count, isSmall && { fontSize: 16, letterSpacing: 2 }]}>
         {String(count).padStart(3, '0')}
       </Text>
-      <Text variant="caption" color={COLORS.textSecondary} style={styles.label}>
+      <Text variant="caption" color={COLORS.textSecondary} style={[styles.label, isSmall && { fontSize: 8 }]}>
         🔥 {label}
       </Text>
     </Animated.View>

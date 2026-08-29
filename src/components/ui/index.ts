@@ -8,6 +8,7 @@ export * from './Badge';
 export * from './Chip';
 export * from './StatusIndicator';
 export * from './BottomSheet';
+export * from './DynamicForm';
 
 // Animated Components
 export * from './SkeletonLoader';

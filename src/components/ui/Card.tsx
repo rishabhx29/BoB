@@ -1,15 +1,18 @@
-import React from 'react';
-import { View, ViewProps, StyleSheet } from 'react-native';
+import { View, ViewProps, StyleSheet, TouchableOpacity } from 'react-native';
 import { COLORS, SHADOWS, SIZES } from '@/constants/theme';
 
 export interface CardProps extends ViewProps {
   padding?: number;
   elevation?: 'soft' | 'medium' | 'high';
+  onPress?: () => void;
+  onLongPress?: () => void;
 }
 
 export function Card({
   padding = SIZES.padding,
   elevation = 'medium',
+  onPress,
+  onLongPress,
   style,
   children,
   ...rest
@@ -24,14 +27,30 @@ export function Card({
     }
   };
 
+  const combinedStyle = [
+    styles.container,
+    { padding },
+    getShadow(),
+    style,
+  ];
+
+  if (onPress || onLongPress) {
+    return (
+      <TouchableOpacity
+        style={combinedStyle}
+        onPress={onPress}
+        onLongPress={onLongPress}
+        activeOpacity={0.8}
+        {...(rest as any)}
+      >
+        {children}
+      </TouchableOpacity>
+    );
+  }
+
   return (
     <View
-      style={[
-        styles.container,
-        { padding },
-        getShadow(),
-        style,
-      ]}
+      style={combinedStyle}
       {...rest}
     >
       {children}
