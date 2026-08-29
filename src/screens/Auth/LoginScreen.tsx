@@ -9,7 +9,7 @@ import { z } from 'zod';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { firebaseAuth } from '@/services/firebase';
 import { useAuthStore } from '@/store/useAuthStore';
-import * as SecureStore from 'expo-secure-store';
+import { storage } from '@/utils/storage';
 
 const loginSchema = z.object({
   email: z.string().email('Invalid email address'),
@@ -43,7 +43,7 @@ export default function LoginScreen({ navigation }: any) {
       const token = await userCredential.user.getIdToken();
       
       // Save token and set user
-      await SecureStore.setItemAsync('token', 'fake-token');
+      await storage.setItem('streakpact_jwt', token);
       setUser({
         id: userCredential.user.uid,
         email: userCredential.user.email || '',
