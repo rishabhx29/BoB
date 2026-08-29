@@ -6,6 +6,7 @@ import { COLORS, SIZES, SHADOWS } from '@/constants/theme';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { z } from 'zod';
+import { joinGroupByCode } from '@/services/groupService';
 
 const CODE_LENGTH = 6;
 const joinSchema = z.string().length(CODE_LENGTH).regex(/^[A-HJ-NP-Z2-9]+$/, "Invalid characters. Use A-Z, 2-9 (no 0, 1, I, O)");
@@ -15,23 +16,28 @@ export default function JoinGroupScreen() {
   const route = useRoute<any>();
   const [code, setCode] = useState(route.params?.code || '');
   const [error, setError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
   const [permission, requestPermission] = useCameraPermissions();
   const inputRef = useRef<TextInput>(null);
 
-  useEffect(() => {
-    if (code.length === CODE_LENGTH) {
+  const handleJoin = async (codeToJoin = code) => {
+    if (isSubmitting) return;
+    const result = joinSchema.safeParse(codeToJoin);
+    if (result.success) {
+      setIsSubmitting(true);
+      setError('');
       try {
-        joinSchema.parse(code);
-        // Add a slight delay for better UX
-        setTimeout(() => {
-          navigation.replace('GroupHome', { groupId: code });
-        }, 300);
-      } catch (e) {
-        // Just let them fix it if invalid
+        const group = await joinGroupByCode(codeToJoin);
+        navigation.replace('GroupHome', { groupId: group.id });
+      } catch (err: any) {
+        setIsSubmitting(false);
+        setError(err.message || 'Failed to join group');
       }
+    } else {
+      setError(result.error.issues[0].message);
     }
-  }, [code, navigation]);
+  };
 
   const handleCodeChange = (text: string) => {
     const upperText = text.toUpperCase().replace(/[^A-HJ-NP-Z2-9]/g, '');
@@ -40,16 +46,7 @@ export default function JoinGroupScreen() {
     
     if (upperText.length === CODE_LENGTH) {
       Keyboard.dismiss();
-    }
-  };
-
-  const handleJoin = () => {
-    const result = joinSchema.safeParse(code);
-    if (result.success) {
-      // Valid code, proceed to join
-      navigation.replace('GroupHome', { groupId: code });
-    } else {
-      setError(result.error.issues[0].message);
+      setTimeout(() => handleJoin(upperText), 300);
     }
   };
 
@@ -58,8 +55,9 @@ export default function JoinGroupScreen() {
     // Assuming QR code contains deep link: streakpact://invite/CODE
     const match = data.match(/invite\/([A-Z2-9]{6})/i);
     if (match) {
-      setCode(match[1].toUpperCase());
-      setTimeout(handleJoin, 500);
+      const scannedCode = match[1].toUpperCase();
+      setCode(scannedCode);
+      setTimeout(() => handleJoin(scannedCode), 500);
     } else {
       setError("Invalid QR Code format.");
     }
@@ -178,9 +176,9 @@ export default function JoinGroupScreen() {
 
       <View style={styles.footer}>
         <Button 
-          label="Join Pact" 
-          onPress={handleJoin} 
-          disabled={code.length < CODE_LENGTH}
+          label={isSubmitting ? "Joining..." : "Join Pact"} 
+          onPress={() => handleJoin(code)} 
+          disabled={isSubmitting || code.length < CODE_LENGTH}
         />
       </View>
     </View>

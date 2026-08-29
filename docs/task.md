@@ -37,11 +37,11 @@
 ### 1.4 Backend Infrastructure
 - [x] Create Supabase project + configure env variables
 - [x] Create Firebase project (Auth, Firestore, Cloud Messaging)
-- [ ] Create Supabase database tables (users, groups, group_members, activities, submissions, streaks, badges, user_badges)
-- [ ] Configure Row-Level Security (RLS) policies
-- [ ] Set up Supabase Storage bucket `submission-photos`
-- [ ] Create Firestore collections structure
-- [ ] Write Firestore security rules
+- [x] Create Supabase database tables (users, groups, group_members, activities, submissions, streaks, badges, user_badges)
+- [x] Configure Row-Level Security (RLS) policies
+- [x] Set up Supabase Storage bucket `submission-photos`
+- [x] Create Firestore collections structure
+- [x] Write Firestore security rules
 - [ ] Set up Supabase Edge Functions project
 
 ### 1.5 State Management & Data Layer
@@ -109,8 +109,8 @@
 - [x] Step 3: Set group "vibe" (optional)
 - [x] Step 4: Group goal description (optional)
 - [x] Step 5: Invite screen (code + link + QR)
-- [ ] Store group in Supabase, assign ADMIN role
-- [ ] Invite code generation with collision retry
+- [x] Store group in Supabase, assign ADMIN role
+- [x] Invite code generation with collision retry
 
 ### 3.3 Join Group Flow
 - [x] Manual code entry (segmented 6-char input)
@@ -119,7 +119,7 @@
 - [x] Validate invite code
 - [x] Check group capacity (max 6)
 - [x] "Group is full" error handling
-- [ ] Add to group_members, trigger notification
+- [x] Add to group_members, trigger notification
 
 ### 3.4 Group Home Screen
 - [x] Header: group info + member avatars + group streak
@@ -150,38 +150,38 @@
 ## Phase 4: Activity System & Templates (1.5 weeks)
 
 ### 4.1 Activity Templates Engine
-- [ ] Define all 9 preset activity templates (fields, icons, colors)
-- [ ] Field definition schema (text, number, multiselect, singleselect, toggle, stars, emoji-scale)
-- [ ] Store as `constants/activityTemplates.ts`
+- [x] Define all 9 preset activity templates (fields, icons, colors)
+- [x] Field definition schema (text, number, multiselect, singleselect, toggle, stars, emoji-scale)
+- [x] Store as `constants/activityTemplates.ts`
 
 ### 4.2 Create Activity Flow
-- [ ] Activity selector grid (preset cards + "Create Custom")
-- [ ] Preset flow: select → configure frequency → rest days → photo toggle → confirm
-- [ ] Custom flow: name + icon + color → frequency → custom fields → photo → confirm
-- [ ] Store activity in Supabase `activities` table
+- [x] Activity selector grid (preset cards + "Create Custom")
+- [x] Preset flow: select → configure frequency → rest days → photo toggle → confirm
+- [x] Custom flow: name + icon + color → frequency → custom fields → photo → confirm
+- [x] Store activity in Supabase `activities` table
 
 ### 4.3 Activity Card Component
-- [ ] Color-coded header bar
-- [ ] Member streak grid (avatar + streak + today status)
-- [ ] "Submit for today" CTA with pulsing glow
+- [x] Color-coded header bar
+- [x] Member streak grid (avatar + streak + today status)
+- [x] "Submit for today" CTA with pulsing glow
 
 ### 4.4 Activity Detail Screen
-- [ ] Header with icon, name, color
-- [ ] Calendar | Submissions History tabs
-- [ ] Activity info (frequency, rest days, fields)
-- [ ] Admin actions: Edit, Archive
+- [x] Header with icon, name, color
+- [x] Calendar | Submissions History tabs
+- [x] Activity info (frequency, rest days, fields)
+- [x] Admin actions: Edit, Archive
 
 ### 4.5 Dynamic Form Renderer
-- [ ] Generic DynamicForm component from templateFields JSON
-- [ ] Text field renderer
-- [ ] Number field renderer
-- [ ] Multi-select chips renderer
-- [ ] Single select renderer
-- [ ] Toggle renderer
-- [ ] Star rating renderer
-- [ ] Emoji scale renderer
-- [ ] Required field validation + inline errors
-- [ ] React Hook Form integration
+- [x] Generic DynamicForm component from templateFields JSON
+- [x] Text field renderer
+- [x] Number field renderer
+- [x] Multi-select chips renderer
+- [x] Single select renderer
+- [x] Toggle renderer
+- [x] Star rating renderer
+- [x] Emoji scale renderer
+- [x] Required field validation + inline errors
+- [x] React Hook Form integration
 
 ---
 
@@ -462,10 +462,10 @@
 
 | Phase | Tasks | Done | Status |
 |---|---|---|---|
-| 1. Foundation | 28 | 20 | [/] In Progress |
-| 2. Auth & Onboarding | 21 | 18 | [/] In Progress |
-| 3. Groups & Teams | 29 | 0 | ⬜ Not Started |
-| 4. Activity System | 20 | 0 | ⬜ Not Started |
+| 1. Foundation | 32 | 30 | [/] In Progress |
+| 2. Auth & Onboarding | 24 | 20 | [/] In Progress |
+| 3. Groups & Teams | 38 | 38 | [x] Completed |
+| 4. Activity System | 20 | 20 | [x] Completed |
 | 5. Submissions | 24 | 0 | ⬜ Not Started |
 | 6. Calendar & Streaks | 24 | 0 | ⬜ Not Started |
 | 7. Social & Feed | 24 | 0 | ⬜ Not Started |

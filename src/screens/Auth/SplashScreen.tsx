@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { View, Animated, StyleSheet, Dimensions, Platform, Easing } from 'react-native';
 import { Text } from '@/components/ui';
 import { COLORS, SHADOWS, SIZES } from '../../../constants/theme';
-import * as SecureStore from 'expo-secure-store';
+import { storage } from '@/utils/storage';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuthStore } from '@/store/useAuthStore';
 
@@ -66,7 +66,7 @@ export default function SplashScreen({ navigation }: any) {
       // Give a brief moment to show full text before transitioning
       await new Promise(resolve => setTimeout(resolve, 800));
 
-      const token = await SecureStore.getItemAsync('streakpact_jwt');
+      const token = await storage.getItem('streakpact_jwt');
       const onboardingCompleted = await AsyncStorage.getItem('onboarding_completed');
 
         if (token) {

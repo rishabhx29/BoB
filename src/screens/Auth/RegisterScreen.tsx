@@ -8,6 +8,8 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { firebaseAuth } from '@/services/firebase';
+import { useAuthStore } from '@/store/useAuthStore';
+import { storage } from '@/utils/storage';
 import * as SecureStore from 'expo-secure-store';
 
 const registerSchema = z.object({
@@ -46,6 +48,21 @@ export default function RegisterScreen({ navigation }: any) {
       const token = await userCredential.user.getIdToken();
       
       // Save token
+      await storage.setItem('streakpact_jwt', token);
+      setUser({
+        id: userCredential.user.uid,
+        email: userCredential.user.email || '',
+        displayName: 'New User',
+        username: 'NewUser',
+        avatarUrl: null,
+        level: 1,
+        xp: 0,
+        shieldsAvailable: 3,
+        totalSubmissions: 0,
+        longestStreak: 0,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
       await SecureStore.setItemAsync('streakpact_jwt', token);
 
       // We should ideally navigate to an Avatar/Username setup screen next.
