@@ -1,91 +1,100 @@
-import React, { useRef, useState } from 'react';
-import { Pressable, StyleSheet, ViewStyle, StyleProp, Animated, View } from 'react-native';
-import { COLORS, SHADOWS, SIZES } from '@/constants/theme';
+import React, { useCallback } from 'react';
+import { Pressable, StyleSheet, ViewStyle, StyleProp, View } from 'react-native';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+  interpolate,
+} from 'react-native-reanimated';
+import { COLORS, RADIUS } from '@/constants/theme';
 import { Text } from './Text';
+import { Icon, IconName } from './Icon';
 import * as Haptics from 'expo-haptics';
 
 export interface ChipProps {
   label: string;
-  icon?: string;
+  icon?: IconName;
   isSelected?: boolean;
   onPress?: () => void;
+  variant?: 'default' | 'accent';
   style?: StyleProp<ViewStyle>;
 }
 
-export function Chip({ label, icon, isSelected = false, onPress, style }: ChipProps) {
-  const [isPressed, setIsPressed] = useState(false);
-  const translateY = useRef(new Animated.Value(0)).current;
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
-  const handlePressIn = () => {
-    setIsPressed(true);
-    Animated.spring(translateY, { toValue: 2, useNativeDriver: true, speed: 50 }).start();
-  };
+export function Chip({ label, icon, isSelected = false, onPress, variant = 'default', style }: ChipProps) {
+  const press = useSharedValue(0);
 
-  const handlePressOut = () => {
-    setIsPressed(false);
-    Animated.spring(translateY, { toValue: 0, useNativeDriver: true, speed: 50 }).start();
-  };
+  const handlePressIn = useCallback(() => {
+    press.value = withSpring(1, { damping: 18, stiffness: 320 });
+  }, [press]);
 
-  const handlePress = () => {
-    try {
-      Haptics.selectionAsync();
-    } catch {}
-    if (onPress) onPress();
-  };
+  const handlePressOut = useCallback(() => {
+    press.value = withSpring(0, { damping: 18, stiffness: 320 });
+  }, [press]);
 
-  const containerStyle = [
-    styles.container,
-    isSelected ? styles.selected : SHADOWS.softElevation,
-    style,
-  ];
+  const handlePress = useCallback(() => {
+    try { Haptics.selectionAsync(); } catch {}
+    onPress?.();
+  }, [onPress]);
+
+  const pressStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: interpolate(press.value, [0, 1], [1, 0.96]) }],
+  }));
+
+  const isAccent = variant === 'accent';
+  const selected = isSelected || isAccent;
 
   return (
-    <Animated.View style={{ transform: [{ translateY }] }}>
-      <Pressable 
-        onPress={handlePress} 
-        onPressIn={handlePressIn}
-        onPressOut={handlePressOut}
-        style={containerStyle}
+    <AnimatedPressable
+      onPress={handlePress}
+      onPressIn={handlePressIn}
+      onPressOut={handlePressOut}
+      style={[
+        styles.container,
+        {
+          backgroundColor: selected ? COLORS.inkDisplay : COLORS.surfaceElevated,
+          borderColor: selected ? COLORS.inkDisplay : COLORS.hairline,
+        },
+        style,
+        pressStyle,
+      ]}
+      accessibilityRole="button"
+      accessibilityState={{ selected }}
+    >
+      {icon && (
+        <Icon
+          name={icon}
+          size={15}
+          color={selected ? COLORS.inkInverse : COLORS.inkPrimary}
+        />
+      )}
+      <Text
+        variant="label"
+        color={selected ? COLORS.inkInverse : COLORS.inkPrimary}
+        style={styles.label}
       >
-        <View style={styles.contentRow}>
-          {icon ? <Text style={styles.icon}>{icon}</Text> : null}
-          <Text 
-            variant="caption" 
-            color={isSelected ? COLORS.brandPrimary : COLORS.textPrimary}
-            style={styles.label}
-          >
-            {label}
-          </Text>
-        </View>
-      </Pressable>
-    </Animated.View>
+        {label}
+      </Text>
+    </AnimatedPressable>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: COLORS.surfaceBase,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: SIZES.radiusPill,
-    alignSelf: 'flex-start',
-    marginRight: 8,
-    marginBottom: 8,
-  },
-  selected: {
-    borderWidth: 1.5,
-    borderColor: COLORS.brandPrimary,
-    backgroundColor: COLORS.surfaceDark,
-  },
-  contentRow: {
     flexDirection: 'row',
     alignItems: 'center',
-  },
-  icon: {
-    fontSize: 14,
-    marginRight: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderRadius: RADIUS.pill,
+    borderWidth: 1,
+    alignSelf: 'flex-start',
+    gap: 6,
   },
   label: {
-    fontFamily: 'Inter-SemiBold',
+    fontSize: 14,
+    lineHeight: 18,
   },
 });
+
+export default Chip;

@@ -1,66 +1,128 @@
-import React, { useState } from 'react';
-import { TextInput, TextInputProps, StyleSheet, View, StyleProp, ViewStyle } from 'react-native';
-import { COLORS, SIZES, TYPOGRAPHY } from '@/constants/theme';
+import React, { useState, useCallback } from 'react';
+import {
+  TextInput,
+  TextInputProps,
+  StyleSheet,
+  View,
+  StyleProp,
+  ViewStyle,
+  Pressable,
+} from 'react-native';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+  Easing,
+} from 'react-native-reanimated';
+import { COLORS, RADIUS, SPACE, TYPOGRAPHY } from '@/constants/theme';
 import { Text } from './Text';
+import { Icon, IconName } from './Icon';
 
 export interface InputProps extends TextInputProps {
   label?: string;
+  hint?: string;
   error?: string;
-  leftIcon?: React.ReactNode;
-  rightIcon?: React.ReactNode;
+  leadingIcon?: IconName;
+  trailingIcon?: IconName;
+  onTrailingIconPress?: () => void;
   containerStyle?: StyleProp<ViewStyle>;
 }
 
-export function Input({ 
-  label, 
-  error, 
-  leftIcon, 
-  rightIcon, 
-  containerStyle, 
-  style, 
-  onFocus, 
-  onBlur, 
-  ...rest 
+export function Input({
+  label,
+  hint,
+  error,
+  leadingIcon,
+  trailingIcon,
+  onTrailingIconPress,
+  containerStyle,
+  style,
+  onFocus,
+  onBlur,
+  secureTextEntry,
+  ...rest
 }: InputProps) {
   const [isFocused, setIsFocused] = useState(false);
+  const [isSecure, setIsSecure] = useState(!!secureTextEntry);
+  const focus = useSharedValue(0);
 
-  const handleFocus = (e: any) => {
+  const handleFocus = useCallback((e: any) => {
     setIsFocused(true);
-    if (onFocus) onFocus(e);
-  };
+    focus.value = withTiming(1, { duration: 180, easing: Easing.out(Easing.cubic) });
+    onFocus?.(e);
+  }, [focus, onFocus]);
 
-  const handleBlur = (e: any) => {
+  const handleBlur = useCallback((e: any) => {
     setIsFocused(false);
-    if (onBlur) onBlur(e);
-  };
+    focus.value = withTiming(0, { duration: 180, easing: Easing.out(Easing.cubic) });
+    onBlur?.(e);
+  }, [focus, onBlur]);
+
+  const borderStyle = useAnimatedStyle(() => ({
+    borderColor: error
+      ? COLORS.danger
+      : focus.value > 0.5
+        ? COLORS.inkDisplay
+        : COLORS.hairlineStrong,
+    borderWidth: focus.value > 0.5 ? 1.5 : 1,
+  }));
+
+  const showTrailing = trailingIcon || secureTextEntry;
+  const trailingIconName: IconName | undefined = secureTextEntry
+    ? (isSecure ? 'eye' : 'eye-slash')
+    : trailingIcon;
 
   return (
     <View style={[styles.container, containerStyle]}>
       {label && (
-        <Text variant="caption" style={styles.label}>
-          {label}
-        </Text>
+        <Text variant="label" style={styles.label}>{label}</Text>
       )}
-      <View style={[
-        styles.inputContainer, 
-        isFocused && styles.inputFocused,
-        error ? styles.inputError : null
-      ]}>
-        {leftIcon && <View style={styles.iconLeft}>{leftIcon}</View>}
+      <Animated.View style={[styles.inputContainer, borderStyle]}>
+        {leadingIcon && (
+          <View style={styles.iconLeading}>
+            <Icon name={leadingIcon} size={20} color={isFocused ? COLORS.inkDisplay : COLORS.inkTertiary} />
+          </View>
+        )}
         <TextInput
-          style={[styles.input, leftIcon ? { paddingLeft: 8 } : null, rightIcon ? { paddingRight: 8 } : null, style]}
-          placeholderTextColor={COLORS.textSecondary}
+          style={[
+            styles.input,
+            leadingIcon ? { paddingLeft: 0 } : null,
+            showTrailing ? { paddingRight: 0 } : null,
+            style,
+          ]}
+          placeholderTextColor={COLORS.inkTertiary}
+          selectionColor={COLORS.accent}
           onFocus={handleFocus}
           onBlur={handleBlur}
+          secureTextEntry={isSecure}
           {...rest}
         />
-        {rightIcon && <View style={styles.iconRight}>{rightIcon}</View>}
-      </View>
-      {error && (
-        <Text variant="caption" color={COLORS.danger} style={styles.errorText}>
+        {showTrailing && (
+          <Pressable
+            onPress={() => {
+              if (secureTextEntry) setIsSecure(s => !s);
+              else onTrailingIconPress?.();
+            }}
+            style={styles.iconTrailing}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel={secureTextEntry ? (isSecure ? 'Show password' : 'Hide password') : undefined}
+          >
+            {trailingIconName && (
+              <Icon name={trailingIconName} size={20} color={COLORS.inkTertiary} />
+            )}
+          </Pressable>
+        )}
+      </Animated.View>
+      {error ? (
+        <Text variant="caption" color={COLORS.danger} style={styles.message}>
           {error}
         </Text>
-      )}
+      ) : hint ? (
+        <Text variant="caption" color={COLORS.inkSecondary} style={styles.message}>
+          {hint}
+        </Text>
+      ) : null}
     </View>
   );
 }
@@ -68,46 +130,39 @@ export function Input({
 const styles = StyleSheet.create({
   container: {
     width: '100%',
-    marginBottom: SIZES.padding / 2,
   },
   label: {
     marginBottom: 8,
-    marginLeft: 4,
+    color: COLORS.inkPrimary,
   },
   inputContainer: {
-    backgroundColor: COLORS.surfaceDark,
-    borderRadius: SIZES.radiusScreen,
-    borderWidth: 1.5,
-    borderColor: 'rgba(0,0,0,0.05)',
+    backgroundColor: COLORS.surfaceElevated,
+    borderRadius: RADIUS.md,
     flexDirection: 'row',
     alignItems: 'center',
-  },
-  inputFocused: {
-    borderColor: COLORS.brandPrimary,
-    backgroundColor: COLORS.surfaceBase,
-  },
-  inputError: {
-    borderColor: COLORS.danger,
+    minHeight: 52,
   },
   input: {
     ...TYPOGRAPHY.body,
     flex: 1,
     paddingHorizontal: 16,
     paddingVertical: 14,
-    color: COLORS.textPrimary,
+    color: COLORS.inkDisplay,
   },
-  iconLeft: {
+  iconLeading: {
     paddingLeft: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
+    paddingRight: 10,
   },
-  iconRight: {
+  iconTrailing: {
     paddingRight: 16,
+    paddingLeft: 10,
+    height: '100%',
     justifyContent: 'center',
-    alignItems: 'center',
   },
-  errorText: {
-    marginTop: 4,
-    marginLeft: 4,
+  message: {
+    marginTop: 6,
+    marginLeft: 2,
   },
 });
+
+export default Input;

@@ -1,12 +1,20 @@
 import React, { useMemo } from 'react';
-import { View, StyleSheet, TouchableOpacity, Switch, TextInput } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, Switch, TextInput, Pressable } from 'react-native';
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+  withTiming,
+} from 'react-native-reanimated';
 import { Text } from '@/components/ui/Text';
 import { Button } from '@/components/ui/Button';
-import { COLORS, SIZES, SHADOWS } from '@/constants/theme';
+import { Input } from '@/components/ui/Input';
+import { COLORS, RADIUS, SHADOWS } from '@/constants/theme';
 import { FieldDefinition } from '@/types';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { Icon, IconName } from './Icon';
 
 interface DynamicFormProps {
   fields: FieldDefinition[];
@@ -19,7 +27,7 @@ const generateSchema = (fields: FieldDefinition[]) => {
   const schemaShape: any = {};
   fields.forEach(f => {
     let fieldSchema: z.ZodTypeAny;
-    switch(f.type) {
+    switch (f.type) {
       case 'text':
       case 'singleselect':
         fieldSchema = z.string();
@@ -60,140 +68,205 @@ const generateSchema = (fields: FieldDefinition[]) => {
 
 export function DynamicForm({ fields, onSubmit, submitLabel = 'Submit', isSubmitting = false }: DynamicFormProps) {
   const schema = useMemo(() => generateSchema(fields), [fields]);
-  
+
   const { control, handleSubmit, formState: { errors } } = useForm({
     resolver: zodResolver(schema),
     defaultValues: fields.reduce((acc, f) => {
       if (f.type === 'multiselect') acc[f.id] = [];
       else if (f.type === 'toggle') acc[f.id] = false;
       return acc;
-    }, {} as any)
+    }, {} as any),
   });
-
-  const renderField = (field: FieldDefinition, onChange: any, value: any) => {
-    switch (field.type) {
-      case 'text':
-      case 'number':
-        return (
-          <TextInput
-            style={styles.textInput}
-            value={value !== undefined && value !== null ? String(value) : ''}
-            onChangeText={onChange}
-            placeholder={`Enter ${field.label.toLowerCase()}`}
-            placeholderTextColor={COLORS.textSecondary}
-            keyboardType={field.type === 'number' ? 'numeric' : 'default'}
-          />
-        );
-      case 'multiselect':
-        return (
-          <View style={styles.chipContainer}>
-            {field.options?.map(opt => {
-              const isSelected = Array.isArray(value) && value.includes(opt);
-              return (
-                <TouchableOpacity
-                  key={opt}
-                  style={[styles.chip, isSelected && styles.chipActive]}
-                  onPress={() => {
-                    const current = Array.isArray(value) ? value : [];
-                    if (isSelected) {
-                      onChange(current.filter(i => i !== opt));
-                    } else {
-                      onChange([...current, opt]);
-                    }
-                  }}
-                >
-                  <Text style={isSelected ? styles.chipTextActive : undefined}>{opt}</Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        );
-      case 'singleselect':
-        return (
-          <View style={styles.chipContainer}>
-            {field.options?.map(opt => (
-              <TouchableOpacity
-                key={opt}
-                style={[styles.chip, value === opt && styles.chipActive]}
-                onPress={() => onChange(opt)}
-              >
-                <Text style={value === opt ? styles.chipTextActive : undefined}>{opt}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        );
-      case 'toggle':
-        return (
-          <Switch
-            value={!!value}
-            onValueChange={onChange}
-            trackColor={{ false: COLORS.surfaceDark, true: COLORS.brandPrimary }}
-          />
-        );
-      case 'stars':
-      case 'emoji-scale':
-        const max = 5;
-        const emojis = field.type === 'emoji-scale' ? ['😴', '😐', '🙂', '😃', '😤'] : ['⭐', '⭐', '⭐', '⭐', '⭐'];
-        return (
-          <View style={styles.ratingContainer}>
-            {[1, 2, 3, 4, 5].map(num => (
-              <TouchableOpacity
-                key={num}
-                style={[styles.ratingBtn, value === num && styles.ratingBtnActive]}
-                onPress={() => onChange(num)}
-              >
-                <Text style={{ fontSize: field.type === 'emoji-scale' ? 32 : 24, opacity: value === num ? 1 : 0.3 }}>
-                  {emojis[num - 1]}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        );
-      default:
-        return null;
-    }
-  };
 
   return (
     <View style={styles.formContainer}>
       {fields.map(field => (
-        <View key={field.id} style={styles.fieldWrapper}>
-          <View style={styles.labelRow}>
-            <Text variant="headingMd" style={styles.label}>
-              {field.label} {field.required && <Text color={COLORS.danger}>*</Text>}
-            </Text>
-            {field.unit && <Text variant="caption" color={COLORS.textSecondary}>({field.unit})</Text>}
-          </View>
-          
-          <Controller
-            control={control}
-            name={field.id}
-            render={({ field: { onChange, value } }) => (
-              <View style={[
-                styles.inputWrapper, 
-                field.type === 'toggle' && styles.toggleWrapper
-              ]}>
-                {renderField(field, onChange, value)}
-              </View>
-            )}
-          />
-          
-          {errors[field.id] && (
-            <Text variant="caption" color={COLORS.danger} style={styles.errorText}>
-              {errors[field.id]?.message as string}
-            </Text>
-          )}
-        </View>
+        <FieldRenderer
+          key={field.id}
+          field={field}
+          control={control}
+          error={errors[field.id]?.message as string | undefined}
+        />
       ))}
 
       <View style={styles.submitWrapper}>
-        <Button 
-          label={isSubmitting ? "Submitting..." : submitLabel} 
-          onPress={handleSubmit(onSubmit)} 
+        <Button
+          label={isSubmitting ? 'Submitting…' : submitLabel}
+          onPress={handleSubmit(onSubmit)}
           disabled={isSubmitting}
+          fullWidth
+          trailingIcon="paper-plane-right"
         />
       </View>
     </View>
+  );
+}
+
+function FieldRenderer({ field, control, error }: { field: FieldDefinition; control: any; error?: string }) {
+  return (
+    <View style={styles.fieldWrapper}>
+      <View style={styles.labelRow}>
+        <Text variant="headingSm" style={styles.label}>
+          {field.label}
+          {field.required && <Text variant="headingSm" color={COLORS.accent}> *</Text>}
+        </Text>
+        {field.unit && (
+          <Text variant="caption" color={COLORS.inkSecondary}>({field.unit})</Text>
+        )}
+      </View>
+
+      <Controller
+        control={control}
+        name={field.id}
+        render={({ field: { onChange, value } }) => (
+          <View>
+            {renderField(field, onChange, value)}
+          </View>
+        )}
+      />
+
+      {error && (
+        <Text variant="caption" color={COLORS.danger} style={styles.errorText}>
+          {error}
+        </Text>
+      )}
+    </View>
+  );
+}
+
+function renderField(field: FieldDefinition, onChange: any, value: any) {
+  switch (field.type) {
+    case 'text':
+      return (
+        <Input
+          value={value ?? ''}
+          onChangeText={onChange}
+          placeholder={`Enter ${field.label.toLowerCase()}`}
+        />
+      );
+    case 'number':
+      return (
+        <Input
+          value={value !== undefined && value !== null ? String(value) : ''}
+          onChangeText={(t) => onChange(t === '' ? undefined : Number(t))}
+          placeholder="0"
+          keyboardType="numeric"
+        />
+      );
+    case 'multiselect':
+      return (
+        <View style={styles.chipContainer}>
+          {field.options?.map(opt => {
+            const isSelected = Array.isArray(value) && value.includes(opt);
+            return (
+              <Pressable
+                key={opt}
+                onPress={() => {
+                  const current = Array.isArray(value) ? value : [];
+                  onChange(isSelected ? current.filter(i => i !== opt) : [...current, opt]);
+                }}
+                style={[
+                  styles.formChip,
+                  isSelected ? styles.formChipActive : null,
+                ]}
+              >
+                <Text
+                  variant="label"
+                  color={isSelected ? COLORS.inkInverse : COLORS.inkPrimary}
+                >
+                  {opt}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      );
+    case 'singleselect':
+      return (
+        <View style={styles.chipContainer}>
+          {field.options?.map(opt => (
+            <Pressable
+              key={opt}
+              onPress={() => onChange(opt)}
+              style={[styles.formChip, value === opt ? styles.formChipActive : null]}
+            >
+              <Text
+                variant="label"
+                color={value === opt ? COLORS.inkInverse : COLORS.inkPrimary}
+              >
+                {opt}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+      );
+    case 'toggle':
+      return (
+        <View style={styles.toggleRow}>
+          <Text variant="bodySm" color={COLORS.inkSecondary}>
+            {value ? 'On' : 'Off'}
+          </Text>
+          <Switch
+            value={!!value}
+            onValueChange={onChange}
+            trackColor={{ false: COLORS.hairlineStrong, true: COLORS.accent }}
+            thumbColor="#FFFFFF"
+            ios_backgroundColor={COLORS.hairlineStrong}
+          />
+        </View>
+      );
+    case 'stars':
+    case 'emoji-scale':
+      return (
+        <RatingRow type={field.type} value={value} onChange={onChange} />
+      );
+    default:
+      return null;
+  }
+}
+
+function RatingRow({ type, value, onChange }: { type: 'stars' | 'emoji-scale'; value: any; onChange: (v: number) => void }) {
+  const ratings: IconName[] = type === 'emoji-scale'
+    ? ['smiley-meh', 'smiley', 'sparkle', 'star', 'lightning']
+    : ['star', 'star', 'star', 'star', 'star'];
+  return (
+    <View style={styles.ratingRow}>
+      {[1, 2, 3, 4, 5].map(num => {
+        const active = value === num;
+        const isIcon = type === 'stars';
+        return (
+          <RatingCell
+            key={num}
+            active={active}
+            onPress={() => onChange(num)}
+          >
+            <Icon
+              name={ratings[num - 1]}
+              size={type === 'emoji-scale' ? 30 : 28}
+              color={active ? COLORS.accent : COLORS.inkTertiary}
+              bold={active && isIcon}
+            />
+          </RatingCell>
+        );
+      })}
+    </View>
+  );
+}
+
+function RatingCell({ active, onPress, children }: { active: boolean; onPress: () => void; children: React.ReactNode }) {
+  const scale = useSharedValue(1);
+  const animStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
+  return (
+    <Pressable
+      onPressIn={() => { scale.value = withSpring(0.92, { damping: 18, stiffness: 320 }); }}
+      onPressOut={() => { scale.value = withSpring(1, { damping: 18, stiffness: 320 }); }}
+      onPress={onPress}
+      style={[styles.ratingCell, active ? styles.ratingCellActive : null]}
+    >
+      <Animated.View style={animStyle}>{children}</Animated.View>
+    </Pressable>
   );
 }
 
@@ -202,79 +275,65 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   fieldWrapper: {
-    marginBottom: 24,
+    marginBottom: 28,
   },
   labelRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'baseline',
     marginBottom: 12,
+    gap: 8,
   },
   label: {
-    marginRight: 8,
-  },
-  inputWrapper: {
-    width: '100%',
-  },
-  toggleWrapper: {
-    alignItems: 'flex-start',
-  },
-  textInput: {
-    backgroundColor: COLORS.surfaceDark,
-    borderRadius: 12,
-    padding: 16,
-    color: COLORS.textPrimary,
-    fontSize: 16,
-    fontFamily: 'Inter-Regular',
-    borderWidth: 2,
-    borderColor: 'rgba(0,0,0,0.05)', // Inset look
+    color: COLORS.inkDisplay,
   },
   chipContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
   },
-  chip: {
-    backgroundColor: COLORS.surfaceDark,
+  formChip: {
+    paddingHorizontal: 14,
     paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 20,
-    borderWidth: 2,
-    borderColor: 'rgba(0,0,0,0.05)',
+    borderRadius: RADIUS.pill,
+    backgroundColor: COLORS.surfaceElevated,
+    borderWidth: 1,
+    borderColor: COLORS.hairline,
   },
-  chipActive: {
-    backgroundColor: COLORS.brandPrimary,
-    borderColor: COLORS.brandPrimary,
-    ...SHADOWS.softElevation,
+  formChipActive: {
+    backgroundColor: COLORS.inkDisplay,
+    borderColor: COLORS.inkDisplay,
   },
-  chipTextActive: {
-    color: 'white',
-    fontWeight: 'bold',
+  toggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 6,
   },
-  ratingContainer: {
+  ratingRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    backgroundColor: COLORS.surfaceDark,
-    padding: 8,
-    borderRadius: 24,
-    borderWidth: 2,
-    borderColor: 'rgba(0,0,0,0.05)',
+    backgroundColor: COLORS.surfaceSunken,
+    padding: 6,
+    borderRadius: RADIUS.lg,
   },
-  ratingBtn: {
-    width: 50,
-    height: 50,
-    justifyContent: 'center',
+  ratingCell: {
+    flex: 1,
+    aspectRatio: 1,
     alignItems: 'center',
-    borderRadius: 25,
+    justifyContent: 'center',
+    borderRadius: RADIUS.md,
   },
-  ratingBtnActive: {
-    backgroundColor: COLORS.surfaceBase,
-    ...SHADOWS.softElevation,
+  ratingCellActive: {
+    backgroundColor: COLORS.surfaceElevated,
+    ...SHADOWS.card,
   },
   errorText: {
-    marginTop: 8,
+    marginTop: 6,
   },
   submitWrapper: {
     marginTop: 16,
     marginBottom: 40,
-  }
+  },
 });
+
+export default DynamicForm;

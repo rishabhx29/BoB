@@ -1,67 +1,121 @@
-import { View, ViewProps, StyleSheet, TouchableOpacity } from 'react-native';
-import { COLORS, SHADOWS, SIZES } from '@/constants/theme';
+import React, { useCallback } from 'react';
+import { View, ViewProps, StyleSheet, Pressable, ViewStyle, StyleProp } from 'react-native';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+  interpolate,
+} from 'react-native-reanimated';
+import { COLORS, RADIUS, SHADOWS, SPACE } from '@/constants/theme';
+
+type Variant = 'elevated' | 'flat' | 'outline' | 'sunken';
 
 export interface CardProps extends ViewProps {
-  padding?: number;
-  elevation?: 'soft' | 'medium' | 'high';
+  padding?: keyof typeof SPACE | number | 'none';
+  variant?: Variant;
   onPress?: () => void;
   onLongPress?: () => void;
+  style?: StyleProp<ViewStyle>;
 }
 
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+
 export function Card({
-  padding = SIZES.padding,
-  elevation = 'medium',
+  padding = 'xl',
+  variant = 'elevated',
   onPress,
   onLongPress,
   style,
   children,
   ...rest
 }: CardProps) {
-  
-  const getShadow = () => {
-    switch (elevation) {
-      case 'soft': return SHADOWS.softElevation;
-      case 'high': return SHADOWS.highElevation;
-      case 'medium':
-      default: return SHADOWS.mediumElevation;
-    }
-  };
+  const press = useSharedValue(0);
 
-  const combinedStyle = [
-    styles.container,
-    { padding },
-    getShadow(),
+  const handlePressIn = useCallback(() => {
+    if (!onPress && !onLongPress) return;
+    press.value = withSpring(1, { damping: 22, stiffness: 280 });
+  }, [onPress, onLongPress, press]);
+
+  const handlePressOut = useCallback(() => {
+    if (!onPress && !onLongPress) return;
+    press.value = withSpring(0, { damping: 22, stiffness: 280 });
+  }, [onPress, onLongPress, press]);
+
+  const pressStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: interpolate(press.value, [0, 1], [1, 0.985]) }],
+  }));
+
+  const padValue = padding === 'none' ? 0 : (typeof padding === 'number' ? padding : (SPACE[padding as keyof typeof SPACE] ?? 0));
+
+  const variantStyle = getVariantStyle(variant);
+
+  const containerStyle = [
+    styles.base,
+    { padding: padValue },
+    variantStyle,
     style,
   ];
 
   if (onPress || onLongPress) {
     return (
-      <TouchableOpacity
-        style={combinedStyle}
+      <AnimatedPressable
         onPress={onPress}
         onLongPress={onLongPress}
-        activeOpacity={0.8}
+        onPressIn={handlePressIn}
+        onPressOut={handlePressOut}
+        style={[containerStyle, pressStyle]}
+        accessibilityRole="button"
         {...(rest as any)}
       >
         {children}
-      </TouchableOpacity>
+      </AnimatedPressable>
     );
   }
 
   return (
-    <View
-      style={combinedStyle}
-      {...rest}
-    >
+    <View style={containerStyle} {...rest}>
       {children}
     </View>
   );
 }
 
+function getVariantStyle(v: Variant) {
+  switch (v) {
+    case 'flat':
+      return {
+        backgroundColor: COLORS.surfaceElevated,
+        borderWidth: 0,
+        ...SHADOWS.none,
+      } as const;
+    case 'outline':
+      return {
+        backgroundColor: COLORS.surfaceElevated,
+        borderWidth: 1,
+        borderColor: COLORS.hairline,
+        ...SHADOWS.none,
+      } as const;
+    case 'sunken':
+      return {
+        backgroundColor: COLORS.surfaceSunken,
+        borderWidth: 0,
+        ...SHADOWS.none,
+      } as const;
+    case 'elevated':
+    default:
+      return {
+        backgroundColor: COLORS.surfaceElevated,
+        borderWidth: 1,
+        borderColor: COLORS.hairline,
+        ...SHADOWS.card,
+      } as const;
+  }
+}
+
 const styles = StyleSheet.create({
-  container: {
-    backgroundColor: COLORS.surfaceBase,
-    borderRadius: SIZES.radiusCard,
+  base: {
+    borderRadius: RADIUS.lg,
     width: '100%',
   },
 });
+
+export default Card;

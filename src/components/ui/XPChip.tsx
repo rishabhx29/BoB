@@ -1,45 +1,42 @@
 import React, { useEffect } from 'react';
-import { StyleSheet } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
-  withTiming,
   withSpring,
   withDelay,
+  withTiming,
+  withSequence,
   runOnJS,
+  Easing,
 } from 'react-native-reanimated';
-import { COLORS, SIZES } from '@/constants/theme';
+import { COLORS, RADIUS, SHADOWS } from '@/constants/theme';
 import { Text } from './Text';
+import { Icon, IconName } from './Icon';
 
 export interface XPChipProps {
   xp: number;
+  icon?: IconName;
   onAnimationEnd?: () => void;
 }
 
-/**
- * A chip that slides up from the bottom and fades out after 2 seconds.
- * Shown after a successful submission.
- */
-export function XPChip({ xp, onAnimationEnd }: XPChipProps) {
-  const translateY = useSharedValue(20);
+export function XPChip({ xp, icon = 'lightning', onAnimationEnd }: XPChipProps) {
+  const translateY = useSharedValue(40);
   const opacity = useSharedValue(0);
-  const scale = useSharedValue(0.8);
+  const scale = useSharedValue(0.85);
 
   useEffect(() => {
-    // Slide up and bounce in
-    translateY.value = withSpring(-80, { damping: 8, stiffness: 120 });
-    opacity.value = withTiming(1, { duration: 300 });
-    scale.value = withSpring(1, { damping: 6 });
-
-    // Fade out after 1.5s
-    opacity.value = withDelay(
-      1500,
-      withTiming(0, { duration: 500 }, (finished) => {
-        if (finished && onAnimationEnd) {
-          runOnJS(onAnimationEnd)();
-        }
-      })
+    translateY.value = withSequence(
+      withSpring(0, { damping: 12, stiffness: 200 }),
+      withDelay(1400, withTiming(-100, { duration: 350, easing: Easing.in(Easing.cubic) }))
     );
+    opacity.value = withSequence(
+      withTiming(1, { duration: 200 }),
+      withDelay(1400, withTiming(0, { duration: 350 }, (finished) => {
+        if (finished && onAnimationEnd) runOnJS(onAnimationEnd)();
+      }))
+    );
+    scale.value = withSpring(1, { damping: 12, stiffness: 220 });
   }, [xp]);
 
   const animatedStyle = useAnimatedStyle(() => ({
@@ -48,10 +45,13 @@ export function XPChip({ xp, onAnimationEnd }: XPChipProps) {
   }));
 
   return (
-    <Animated.View style={[styles.chip, animatedStyle]} pointerEvents="none">
-      <Text variant="body" color="#FFFFFF" style={styles.text}>
-        +{xp} XP 🔥
-      </Text>
+    <Animated.View style={[styles.chip, animatedStyle, SHADOWS.cta]} pointerEvents="none">
+      <View style={styles.inner}>
+        <Icon name={icon} size={20} color="#FFFFFF" />
+        <Text variant="headingSm" color="#FFFFFF" style={styles.text}>
+          +{xp} XP
+        </Text>
+      </View>
     </Animated.View>
   );
 }
@@ -59,22 +59,23 @@ export function XPChip({ xp, onAnimationEnd }: XPChipProps) {
 const styles = StyleSheet.create({
   chip: {
     position: 'absolute',
-    bottom: 80,
     alignSelf: 'center',
-    backgroundColor: COLORS.brandPrimary,
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: SIZES.radiusPill,
-    shadowColor: COLORS.brandPrimaryDark,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.8,
-    shadowRadius: 8,
-    elevation: 8,
+    backgroundColor: COLORS.accent,
+    paddingHorizontal: 22,
+    paddingVertical: 12,
+    borderRadius: RADIUS.pill,
     zIndex: 1000,
   },
+  inner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   text: {
-    fontFamily: 'Inter-Bold',
+    fontFamily: 'SpaceGrotesk-Bold',
     fontSize: 18,
-    letterSpacing: 0.5,
+    letterSpacing: 0.2,
   },
 });
+
+export default XPChip;

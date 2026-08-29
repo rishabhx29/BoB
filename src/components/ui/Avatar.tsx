@@ -1,72 +1,134 @@
 import React from 'react';
 import { View, Image, StyleSheet, Text } from 'react-native';
-import { COLORS, SHADOWS } from '@/constants/theme';
+import { COLORS, SHADOWS, RADIUS, TYPOGRAPHY } from '@/constants/theme';
 
 export interface AvatarProps {
   source?: any;
   src?: string | null;
   url?: string | null;
   name?: string;
-  size?: number | 'sm' | 'md' | 'lg' | 'xl';
-  isRecessed?: boolean;
+  size?: number | 'xs' | 'sm' | 'md' | 'lg' | 'xl' | '2xl';
+  ring?: boolean;     // adds a hairline border
+  status?: 'online' | 'away' | 'offline' | 'submitted' | 'pending' | 'rest' | 'missed';
+  style?: any;
 }
 
-export function Avatar({ source, src, url, name, size = 48, isRecessed = false }: AvatarProps) {
-  let dimension = 48;
-  if (typeof size === 'number') {
-    dimension = size;
-  } else if (size === 'sm') {
-    dimension = 32;
-  } else if (size === 'md') {
-    dimension = 48;
-  } else if (size === 'lg') {
-    dimension = 64;
-  } else if (size === 'xl') {
-    dimension = 80;
-  }
+const SIZE_MAP: Record<string, number> = {
+  xs: 24,
+  sm: 32,
+  md: 44,
+  lg: 64,
+  xl: 96,
+  '2xl': 128,
+};
 
+const STATUS_COLOR: Record<string, string> = {
+  online: COLORS.positive,
+  submitted: COLORS.positive,
+  away: COLORS.warning,
+  pending: COLORS.warning,
+  rest: COLORS.inkTertiary,
+  missed: COLORS.danger,
+  offline: COLORS.inkTertiary,
+};
+
+export function Avatar({
+  source, src, url, name, size = 'md', ring = false, status, style,
+}: AvatarProps) {
+  const dimension = typeof size === 'number' ? size : SIZE_MAP[size] ?? 44;
   const rawImage = source || src || url;
-  const imageSource = typeof rawImage === 'string' && rawImage.length > 0 
-    ? { uri: rawImage } 
+  const imageSource = typeof rawImage === 'string' && rawImage.length > 0
+    ? { uri: rawImage }
     : rawImage;
+
+  // Initials for fallback
+  const initials = name
+    ? name.split(' ').filter(Boolean).slice(0, 2).map(s => s[0]?.toUpperCase()).join('')
+    : '';
+
+  // Background tint seeded from name
+  const bgColor = name ? hashColor(name) : COLORS.surfaceSunken;
 
   const containerStyle = [
     styles.container,
-    { width: dimension, height: dimension, borderRadius: dimension / 2 },
-    isRecessed ? styles.recessed : SHADOWS.softElevation,
+    {
+      width: dimension,
+      height: dimension,
+      borderRadius: dimension / 2,
+      backgroundColor: bgColor,
+    },
+    ring ? { borderWidth: 2, borderColor: COLORS.surfaceBase } : null,
+    style,
   ];
 
   return (
     <View style={containerStyle}>
       {imageSource ? (
-        <Image 
-          source={imageSource} 
-          style={{ width: dimension, height: dimension, borderRadius: dimension / 2 }} 
+        <Image
+          source={imageSource}
+          style={{ width: dimension, height: dimension, borderRadius: dimension / 2 }}
         />
+      ) : initials ? (
+        <Text style={[styles.initials, { fontSize: dimension * 0.4 }]}>
+          {initials}
+        </Text>
       ) : (
-        <View style={[styles.placeholder, { width: dimension, height: dimension, borderRadius: dimension / 2 }]}>
-          {name ? (
-            <Text style={{ fontSize: dimension * 0.4, fontWeight: 'bold', color: COLORS.textSecondary }}>
-              {name.charAt(0).toUpperCase()}
-            </Text>
-          ) : null}
-        </View>
+        <View style={styles.empty} />
+      )}
+      {status && (
+        <View
+          style={[
+            styles.statusDot,
+            {
+              width: Math.max(8, dimension * 0.22),
+              height: Math.max(8, dimension * 0.22),
+              borderRadius: Math.max(4, dimension * 0.11),
+              backgroundColor: STATUS_COLOR[status],
+              right: 0,
+              bottom: 0,
+              borderWidth: Math.max(1.5, dimension * 0.04),
+              borderColor: COLORS.surfaceBase,
+            },
+          ]}
+        />
       )}
     </View>
   );
 }
 
+function hashColor(seed: string) {
+  const palette = [
+    '#FFE4D6', '#FFD6E0', '#E8DAFF', '#D6E4FF', '#D6F0FF',
+    '#D6FFE4', '#FFF6D6', '#FFEFD6', '#F0D6FF',
+  ];
+  let h = 0;
+  for (let i = 0; i < seed.length; i++) {
+    h = (h << 5) - h + seed.charCodeAt(i);
+    h |= 0;
+  }
+  return palette[Math.abs(h) % palette.length];
+}
+
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: COLORS.surfaceBase,
-    justifyContent: 'center',
     alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'visible',
   },
-  placeholder: {
-    backgroundColor: COLORS.surfaceDark,
+  initials: {
+    ...TYPOGRAPHY.bodyMedium,
+    color: COLORS.inkDisplay,
+    fontWeight: '600',
   },
-  recessed: {
-    borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.05)',
-  }
+  empty: {
+    width: '60%',
+    height: '60%',
+    borderRadius: RADIUS.pill,
+    backgroundColor: 'rgba(0,0,0,0.08)',
+  },
+  statusDot: {
+    position: 'absolute',
+  },
 });
+
+export default Avatar;
