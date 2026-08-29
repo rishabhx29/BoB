@@ -1,20 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Text, Button } from '@/components/ui';
-import { COLORS, SHADOWS } from '@/constants/theme';
+import { Text, Button, Icon } from '@/components/ui';
+import { COLORS, RADIUS } from '@/constants/theme';
 import * as LocalAuthentication from 'expo-local-authentication';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function BiometricSetupScreen({ navigation }: any) {
-  const [isBiometricSupported, setIsBiometricSupported] = useState(false);
-  const [biometricType, setBiometricType] = useState<string>('Biometrics');
+  const [biometricType, setBiometricType] = useState<'Face ID' | 'Touch ID' | 'Biometrics'>('Biometrics');
+  const [isSupported, setIsSupported] = useState(false);
 
   useEffect(() => {
     (async () => {
       const compatible = await LocalAuthentication.hasHardwareAsync();
-      setIsBiometricSupported(compatible);
-      
+      setIsSupported(compatible);
       if (compatible) {
         const types = await LocalAuthentication.supportedAuthenticationTypesAsync();
         if (types.includes(LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION)) {
@@ -26,25 +25,21 @@ export default function BiometricSetupScreen({ navigation }: any) {
     })();
   }, []);
 
-  const handleEnableBiometrics = async () => {
+  const handleEnable = async () => {
     try {
-      const savedBiometrics = await LocalAuthentication.isEnrolledAsync();
-      if (!savedBiometrics) {
-        alert('No biometric records found. Please set them up in your device settings.');
+      const enrolled = await LocalAuthentication.isEnrolledAsync();
+      if (!enrolled) {
         return;
       }
-
       const result = await LocalAuthentication.authenticateAsync({
-        promptMessage: `Authenticate with ${biometricType} for StreakPact`,
-        fallbackLabel: 'Use Passcode',
+        promptMessage: `Enable ${biometricType} for StreakPact`,
+        fallbackLabel: 'Use passcode',
       });
-
       if (result.success) {
         await AsyncStorage.setItem('biometrics_enabled', 'true');
-        navigation.replace('JoinOrCreate');
       }
-    } catch (e) {
-      console.error(e);
+    } finally {
+      navigation.replace('JoinOrCreate');
     }
   };
 
@@ -56,26 +51,37 @@ export default function BiometricSetupScreen({ navigation }: any) {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.content}>
-        <View style={styles.iconContainer}>
-          <Text style={styles.icon}>{biometricType === 'Face ID' ? '🧑‍💻' : '👆'}</Text>
+        <View style={styles.iconBox}>
+          <Icon
+            name={biometricType === 'Face ID' ? 'user' : 'fingerprint'}
+            size={48}
+            color={COLORS.accent}
+          />
         </View>
-        
-        <Text variant="headingLg" style={styles.title}>Enhance Security</Text>
-        <Text variant="body" color={COLORS.textSecondary} style={styles.description}>
-          Log in faster and keep your accountability private with {biometricType}.
+
+        <Text variant="eyebrow" color={COLORS.inkSecondary} style={styles.step}>Step 2 of 2</Text>
+        <Text variant="displaySm" color={COLORS.inkDisplay} style={styles.title}>
+          Quick, secure access
+        </Text>
+        <Text variant="body" color={COLORS.inkSecondary} style={styles.description}>
+          Use {biometricType} to sign in faster. Your streaks stay private to you.
         </Text>
 
         <View style={styles.actions}>
-          <Button 
+          <Button
             label={`Enable ${biometricType}`}
-            onPress={handleEnableBiometrics} 
-            style={styles.enableBtn}
-            disabled={!isBiometricSupported}
+            onPress={handleEnable}
+            disabled={!isSupported}
+            fullWidth
+            size="lg"
+            leadingIcon="shield-check"
           />
-          <Button 
-            label="Skip for now" 
-            variant="secondary"
-            onPress={handleSkip} 
+          <View style={{ height: 10 }} />
+          <Button
+            label="Skip for now"
+            variant="ghost"
+            onPress={handleSkip}
+            fullWidth
           />
         </View>
       </View>
@@ -84,42 +90,29 @@ export default function BiometricSetupScreen({ navigation }: any) {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.surfaceBase,
-  },
+  container: { flex: 1, backgroundColor: COLORS.surfaceBase },
   content: {
     flex: 1,
     paddingHorizontal: 32,
-    justifyContent: 'center',
     alignItems: 'center',
+    justifyContent: 'center',
   },
-  iconContainer: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: COLORS.surfaceBase,
-    justifyContent: 'center',
+  iconBox: {
+    width: 96,
+    height: 96,
+    borderRadius: RADIUS.xl,
+    backgroundColor: COLORS.accentTint,
     alignItems: 'center',
+    justifyContent: 'center',
     marginBottom: 32,
-    ...SHADOWS.mediumElevation,
   },
-  icon: {
-    fontSize: 60,
-  },
-  title: {
-    marginBottom: 16,
-    textAlign: 'center',
-  },
+  step: { marginBottom: 8 },
+  title: { textAlign: 'center', marginBottom: 12 },
   description: {
     textAlign: 'center',
-    marginBottom: 48,
     lineHeight: 24,
+    marginBottom: 40,
+    maxWidth: 320,
   },
-  actions: {
-    width: '100%',
-  },
-  enableBtn: {
-    marginBottom: 16,
-  },
+  actions: { width: '100%' },
 });

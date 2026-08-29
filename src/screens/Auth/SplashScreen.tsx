@@ -1,83 +1,64 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { View, Animated, StyleSheet, Dimensions, Platform, Easing } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { View, StyleSheet, Dimensions } from 'react-native';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+  withTiming,
+  withDelay,
+  withSequence,
+  Easing,
+} from 'react-native-reanimated';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text } from '@/components/ui';
-import { COLORS, SHADOWS, SIZES } from '../../../constants/theme';
+import { COLORS } from '@/constants/theme';
+import { VoltMark } from '@/components/brand/VoltMark';
 import { storage } from '@/utils/storage';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuthStore } from '@/store/useAuthStore';
 
-const { width, height } = Dimensions.get('window');
-
-// Lottie mascot alternative using purely React Native animations
-const Mascot = ({ scaleAnim }: { scaleAnim: Animated.Value }) => {
-  // A simple bouncing bolt inside a tactile circle
-  return (
-    <Animated.View style={[styles.mascotContainer, { transform: [{ scale: scaleAnim }] }]}>
-      <View style={styles.mascotInnerRecess}>
-        <Text style={styles.boltText}>⚡</Text>
-      </View>
-    </Animated.View>
-  );
-};
+const { width } = Dimensions.get('window');
 
 export default function SplashScreen({ navigation }: any) {
-  const bounceValue = useRef(new Animated.Value(0)).current;
-  const opacityValue = useRef(new Animated.Value(0)).current;
-  const [typedText, setTypedText] = useState('');
-  const fullText = 'StreakPact';
   const { setUser } = useAuthStore();
-  const typingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const markScale = useSharedValue(0.6);
+  const markOpacity = useSharedValue(0);
+  const markRotate = useSharedValue(-15);
+  const wordOpacity = useSharedValue(0);
+  const wordY = useSharedValue(8);
+  const tagOpacity = useSharedValue(0);
 
   useEffect(() => {
-    // Sequence: Bounce mascot, then type text
-    Animated.sequence([
-      Animated.spring(bounceValue, {
-        toValue: 1,
-        friction: 4,
-        tension: 20,
-        useNativeDriver: true,
-      }),
-      Animated.timing(opacityValue, {
-        toValue: 1,
-        duration: 300,
-        easing: Easing.out(Easing.ease),
-        useNativeDriver: true,
-      })
-    ]).start(() => {
-      // Type out app name
-      let i = 0;
-      typingTimerRef.current = setInterval(() => {
-        setTypedText(fullText.substring(0, i + 1));
-        i++;
-        if (i >= fullText.length) {
-          if (typingTimerRef.current) clearInterval(typingTimerRef.current);
-          finishSplash();
-        }
-      }, 100);
-    });
+    // Mark entrance: scale + rotate, settle
+    markScale.value = withSequence(
+      withSpring(1.08, { damping: 10, stiffness: 220, mass: 0.8 }),
+      withSpring(1, { damping: 14, stiffness: 200 })
+    );
+    markOpacity.value = withTiming(1, { duration: 400, easing: Easing.out(Easing.cubic) });
+    markRotate.value = withSpring(0, { damping: 14, stiffness: 180 });
 
-    return () => {
-      if (typingTimerRef.current) clearInterval(typingTimerRef.current);
-    };
+    // Wordmark
+    wordOpacity.value = withDelay(420, withTiming(1, { duration: 380 }));
+    wordY.value = withDelay(420, withSpring(0, { damping: 16, stiffness: 200 }));
+
+    // Tag
+    tagOpacity.value = withDelay(700, withTiming(0.6, { duration: 320 }));
+
+    const timeout = setTimeout(() => finishSplash(), 1500);
+    return () => clearTimeout(timeout);
   }, []);
 
   const finishSplash = async () => {
     try {
-      // Give a brief moment to show full text before transitioning
-      await new Promise(resolve => setTimeout(resolve, 800));
-
       const token = await storage.getItem('streakpact_jwt');
       const onboardingCompleted = await AsyncStorage.getItem('onboarding_completed');
 
-        if (token) {
-        // Ideally we validate the JWT via Supabase/Backend here
-        // If valid, auto-login. For now, bypass validation as per initial logic.
-        // Assume JWT implies authenticated in v1
+      if (token) {
         setUser({
-          id: 'dummy-id',
-          email: 'dummy@example.com',
-          username: 'dummy_user',
-          displayName: 'Dummy User',
+          id: 'restored',
+          email: 'user@streakpact.app',
+          username: 'You',
+          displayName: 'You',
           avatarUrl: null,
           xp: 0,
           level: 1,
@@ -92,94 +73,95 @@ export default function SplashScreen({ navigation }: any) {
       } else {
         navigation.replace('Onboarding');
       }
-    } catch (e) {
-      console.warn('Splash init error:', e);
+    } catch {
       navigation.replace('Onboarding');
     }
   };
 
+  const markStyle = useAnimatedStyle(() => ({
+    opacity: markOpacity.value,
+    transform: [
+      { scale: markScale.value },
+      { rotate: `${markRotate.value}deg` },
+    ],
+  }));
+
+  const wordStyle = useAnimatedStyle(() => ({
+    opacity: wordOpacity.value,
+    transform: [{ translateY: wordY.value }],
+  }));
+
+  const tagStyle = useAnimatedStyle(() => ({
+    opacity: tagOpacity.value,
+  }));
+
   return (
-    <View style={styles.container}>
-      <Mascot scaleAnim={bounceValue} />
-      
-      <Animated.View style={[styles.textContainer, { opacity: opacityValue }]}>
-        <Text style={styles.title}>{typedText}<Text style={styles.cursor}>_</Text></Text>
-      </Animated.View>
-      
-      <View style={styles.versionContainer}>
-        <Text style={styles.versionText}>v1.0.0</Text>
+    <SafeAreaView style={styles.container}>
+      <View style={styles.content}>
+        <Animated.View style={[styles.markWrap, markStyle]}>
+          <VoltMark size={88} withHalo />
+        </Animated.View>
+
+        <Animated.View style={[styles.wordWrap, wordStyle]}>
+          <Text style={styles.wordmark}>
+            Streak<Text style={styles.wordmarkAccent}>Pact</Text>
+          </Text>
+        </Animated.View>
+
+        <Animated.View style={[styles.tagWrap, tagStyle]}>
+          <Text variant="eyebrow" color={COLORS.inkSecondary}>
+            Show up. Together.
+          </Text>
+        </Animated.View>
       </View>
-    </View>
+
+      <View style={styles.footer}>
+        <Text variant="caption" color={COLORS.inkTertiary} style={styles.version}>
+          v1.0.0
+        </Text>
+      </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
     backgroundColor: COLORS.surfaceBase,
   },
-  mascotContainer: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: COLORS.surfaceBase,
-    justifyContent: 'center',
+  content: {
+    flex: 1,
     alignItems: 'center',
-    marginBottom: 40,
-    ...SHADOWS.softElevation,
-  },
-  mascotInnerRecess: {
-    width: 90,
-    height: 90,
-    borderRadius: 45,
-    backgroundColor: COLORS.surfaceDark,
     justifyContent: 'center',
-    alignItems: 'center',
-    // Inset shadow simulation for non-web React Native
-    borderWidth: 2,
-    borderColor: 'rgba(0,0,0,0.05)',
-    overflow: 'hidden',
-    shadowColor: '#fff',
-    shadowOffset: { width: -2, height: -2 },
-    shadowOpacity: 0.8,
-    shadowRadius: 4,
   },
-  boltText: {
-    fontSize: 48,
-    lineHeight: 56, // Ensures emoji doesn't get clipped
-    textShadowColor: COLORS.brandPrimary,
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 10,
+  markWrap: {
+    marginBottom: 28,
   },
-  textContainer: {
-    height: 40,
-    justifyContent: 'center',
+  wordWrap: {
     alignItems: 'center',
   },
-  title: {
-    fontFamily: 'RobotoMono-Bold',
-    fontSize: 28,
-    color: COLORS.textDisplay,
-    letterSpacing: 4,
-    textShadowColor: 'rgba(249, 115, 22, 0.4)',
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 8,
+  wordmark: {
+    fontFamily: 'SpaceGrotesk-Bold',
+    fontSize: 36,
+    lineHeight: 40,
+    letterSpacing: -1.0,
+    color: COLORS.inkDisplay,
   },
-  cursor: {
-    fontFamily: 'RobotoMono-Bold',
-    fontSize: 28,
-    color: COLORS.success,
+  wordmarkAccent: {
+    fontFamily: 'SpaceGrotesk-Bold',
+    fontSize: 36,
+    lineHeight: 40,
+    letterSpacing: -1.0,
+    color: COLORS.accent,
   },
-  versionContainer: {
-    position: 'absolute',
-    bottom: 40,
+  tagWrap: {
+    marginTop: 12,
   },
-  versionText: {
-    fontFamily: 'Inter-Medium',
-    fontSize: 12,
-    color: COLORS.textSecondary,
-    letterSpacing: 2,
+  footer: {
+    alignItems: 'center',
+    paddingBottom: 24,
+  },
+  version: {
+    letterSpacing: 1.2,
   },
 });

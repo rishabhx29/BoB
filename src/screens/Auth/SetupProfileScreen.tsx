@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { View, StyleSheet, KeyboardAvoidingView, Platform, Pressable, Image, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Text, Input, Button } from '@/components/ui';
-import { COLORS, SHADOWS } from '@/constants/theme';
+import { Text, Input, Button, Icon } from '@/components/ui';
+import { COLORS, RADIUS } from '@/constants/theme';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -11,10 +11,11 @@ import { useAuthStore } from '@/store/useAuthStore';
 import { userService } from '@/services/userService';
 
 const profileSchema = z.object({
-  username: z.string()
-    .min(3, 'Must be at least 3 characters')
-    .max(20, 'Must be max 20 characters')
-    .regex(/^[a-zA-Z0-9_]+$/, 'Only alphanumeric and underscores'),
+  username: z
+    .string()
+    .min(3, 'At least 3 characters')
+    .max(20, 'Maximum 20 characters')
+    .regex(/^[a-zA-Z0-9_]+$/, 'Letters, numbers, underscore only'),
 });
 
 type ProfileForm = z.infer<typeof profileSchema>;
@@ -25,46 +26,34 @@ export default function SetupProfileScreen({ navigation }: any) {
   const [usernameError, setUsernameError] = useState<string | null>(null);
   const { user, setUser } = useAuthStore();
 
-  const {
-    control,
-    handleSubmit,
-    formState: { errors },
-  } = useForm<ProfileForm>({
+  const { control, handleSubmit, formState: { errors } } = useForm<ProfileForm>({
     resolver: zodResolver(profileSchema),
-    defaultValues: {
-      username: '',
-    },
+    defaultValues: { username: user?.username || '' },
   });
 
   const pickImage = async () => {
-    let result = await ImagePicker.launchImageLibraryAsync({
+    const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
       aspect: [1, 1],
-      quality: 0.5,
+      quality: 0.6,
     });
-
-    if (!result.canceled) {
-      setAvatar(result.assets[0].uri);
-    }
+    if (!result.canceled) setAvatar(result.assets[0].uri);
   };
 
   const onSubmit = async (data: ProfileForm) => {
     setIsLoading(true);
     setUsernameError(null);
     try {
-      const savedUser = await userService.ensureCurrentUser({
+      const saved = await userService.ensureCurrentUser({
         username: data.username,
         displayName: user?.displayName || data.username,
         avatarUrl: avatar || user?.avatarUrl || null,
       });
-      setUser(savedUser);
-
+      setUser(saved);
       navigation.replace('BiometricSetup');
-    } catch (error: any) {
-      console.error('[SetupProfileScreen] Failed to save profile:', error);
-      setUsernameError('Failed to update profile.');
-      Alert.alert('Setup failed', "We couldn't save your profile. Please try again.");
+    } catch (e: any) {
+      setUsernameError('Could not save profile. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -72,53 +61,64 @@ export default function SetupProfileScreen({ navigation }: any) {
 
   return (
     <SafeAreaView style={styles.container}>
-      <KeyboardAvoidingView 
-        style={styles.keyboardView} 
+      <KeyboardAvoidingView
+        style={styles.kb}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        <View style={styles.header}>
-          <Text variant="headingLg" style={styles.title}>Let's set up your profile</Text>
-          <Text variant="body" color={COLORS.textSecondary}>How should we call you?</Text>
-        </View>
+        <View style={styles.content}>
+          <View style={styles.header}>
+            <Text variant="eyebrow" color={COLORS.inkSecondary} style={styles.step}>Step 1 of 2</Text>
+            <Text variant="displaySm" color={COLORS.inkDisplay} style={styles.title}>
+              Set up your profile
+            </Text>
+            <Text variant="body" color={COLORS.inkSecondary} style={styles.subtitle}>
+              Pick a username your pact will recognize.
+            </Text>
+          </View>
 
-        <View style={styles.avatarContainer}>
-          <Pressable onPress={pickImage} style={styles.avatarButton}>
+          <Pressable onPress={pickImage} style={styles.avatarBtn} accessibilityLabel="Upload avatar">
             {avatar ? (
-              <Image source={{ uri: avatar }} style={styles.avatarImage} />
+              <Image source={{ uri: avatar }} style={styles.avatar} />
             ) : (
-            <View style={styles.avatarPlaceholder}>
-              <Text variant="headingLg" color={COLORS.textSecondary}>+</Text>
-            </View>
+              <View style={styles.avatarPlaceholder}>
+                <Icon name="camera" size={28} color={COLORS.inkSecondary} />
+                <Text variant="caption" color={COLORS.inkSecondary} style={styles.avatarHint}>
+                  Add photo
+                </Text>
+              </View>
             )}
           </Pressable>
-            <Text variant="body" color={COLORS.brandPrimary} style={styles.avatarHint}>
-            Tap to upload avatar
-          </Text>
-        </View>
 
-        <View style={styles.form}>
-          <Controller
-            control={control}
-            name="username"
-            render={({ field: { onChange, onBlur, value } }) => (
-              <Input
-                label="Username"
-                placeholder="e.g. iron_man"
-                autoCapitalize="none"
-                onBlur={onBlur}
-                onChangeText={onChange}
-                value={value}
-                error={errors.username?.message || usernameError || undefined}
-              />
-            )}
-          />
+          <View style={styles.form}>
+            <Controller
+              control={control}
+              name="username"
+              render={({ field: { onChange, onBlur, value } }) => (
+                <Input
+                  label="Username"
+                  placeholder="iron_man"
+                  leadingIcon="user"
+                  autoCapitalize="none"
+                  onBlur={onBlur}
+                  onChangeText={onChange}
+                  value={value}
+                  error={errors.username?.message || usernameError || undefined}
+                  hint="3-20 chars · letters, numbers, underscore"
+                />
+              )}
+            />
 
-          <Button 
-            label={isLoading ? "Saving..." : "Continue"} 
-            onPress={handleSubmit(onSubmit)} 
-            style={styles.continueBtn}
-            disabled={isLoading}
-          />
+            <Button
+              label={isLoading ? 'Saving…' : 'Continue'}
+              onPress={handleSubmit(onSubmit)}
+              disabled={isLoading}
+              loading={isLoading}
+              fullWidth
+              size="lg"
+              trailingIcon="arrow-right"
+              style={styles.submit}
+            />
+          </View>
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -126,50 +126,34 @@ export default function SetupProfileScreen({ navigation }: any) {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.surfaceBase,
-  },
-  keyboardView: {
-    flex: 1,
-    paddingHorizontal: 24,
-    justifyContent: 'center',
-  },
-  header: {
-    marginBottom: 40,
-  },
-  title: {
-    marginBottom: 8,
-  },
-  avatarContainer: {
-    alignItems: 'center',
+  container: { flex: 1, backgroundColor: COLORS.surfaceBase },
+  kb: { flex: 1, paddingHorizontal: 24 },
+  content: { flex: 1, justifyContent: 'center' },
+  header: { marginBottom: 32 },
+  step: { marginBottom: 8 },
+  title: { marginBottom: 8 },
+  subtitle: { lineHeight: 22 },
+  avatarBtn: {
+    alignSelf: 'center',
     marginBottom: 32,
   },
-  avatarButton: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    overflow: 'hidden',
-    backgroundColor: COLORS.surfaceBase,
-    justifyContent: 'center',
-    alignItems: 'center',
-    ...SHADOWS.mediumElevation,
-  },
-  avatarImage: {
-    width: '100%',
-    height: '100%',
+  avatar: {
+    width: 108,
+    height: 108,
+    borderRadius: 54,
   },
   avatarPlaceholder: {
-    justifyContent: 'center',
+    width: 108,
+    height: 108,
+    borderRadius: 54,
+    backgroundColor: COLORS.surfaceElevated,
+    borderWidth: 1,
+    borderColor: COLORS.hairline,
+    borderStyle: 'dashed',
     alignItems: 'center',
+    justifyContent: 'center',
   },
-  avatarHint: {
-    marginTop: 12,
-  },
-  form: {
-    width: '100%',
-  },
-  continueBtn: {
-    marginTop: 32,
-  },
+  avatarHint: { marginTop: 4 },
+  form: { width: '100%' },
+  submit: { marginTop: 28 },
 });

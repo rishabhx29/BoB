@@ -10,15 +10,15 @@ import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { firebaseAuth } from '@/services/firebase';
 import { useAuthStore } from '@/store/useAuthStore';
 import { storage } from '@/utils/storage';
-import * as SecureStore from 'expo-secure-store';
+import { VoltMark } from '@/components/brand/VoltMark';
 
 const registerSchema = z.object({
-  email: z.string().email('Invalid email address'),
-  password: z.string().min(6, 'Password must be at least 6 characters'),
+  email: z.string().email('Enter a valid email'),
+  password: z.string().min(6, 'At least 6 characters'),
   confirmPassword: z.string(),
-}).refine((data) => data.password === data.confirmPassword, {
+}).refine(d => d.password === d.confirmPassword, {
   message: "Passwords don't match",
-  path: ["confirmPassword"],
+  path: ['confirmPassword'],
 });
 
 type RegisterForm = z.infer<typeof registerSchema>;
@@ -28,17 +28,9 @@ export default function RegisterScreen({ navigation }: any) {
   const [isLoading, setIsLoading] = useState(false);
   const { setUser } = useAuthStore();
 
-  const {
-    control,
-    handleSubmit,
-    formState: { errors },
-  } = useForm<RegisterForm>({
+  const { control, handleSubmit, formState: { errors } } = useForm<RegisterForm>({
     resolver: zodResolver(registerSchema),
-    defaultValues: {
-      email: '',
-      password: '',
-      confirmPassword: '',
-    },
+    defaultValues: { email: '', password: '', confirmPassword: '' },
   });
 
   const onSubmit = async (data: RegisterForm) => {
@@ -47,53 +39,50 @@ export default function RegisterScreen({ navigation }: any) {
     try {
       const userCredential = await createUserWithEmailAndPassword(firebaseAuth, data.email, data.password);
       const token = await userCredential.user.getIdToken();
-      
-      // Save token
       await storage.setItem('streakpact_jwt', token);
       setUser({
         id: userCredential.user.uid,
         email: userCredential.user.email || '',
-        displayName: 'New User',
-        username: 'NewUser',
+        displayName: 'You',
+        username: 'You',
         avatarUrl: null,
-        level: 1,
-        xp: 0,
-        shieldsAvailable: 3,
-        totalSubmissions: 0,
-        longestStreak: 0,
+        level: 1, xp: 0, shieldsAvailable: 3,
+        totalSubmissions: 0, longestStreak: 0,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       });
-      await SecureStore.setItemAsync('streakpact_jwt', token);
-
-      // We should ideally navigate to an Avatar/Username setup screen next.
       navigation.replace('SetupProfile');
     } catch (error: any) {
       if (error.code === 'auth/email-already-in-use') {
         setAuthError('An account with this email already exists.');
       } else {
-        setAuthError(error.message);
+        setAuthError(error.message || 'Sign up failed.');
       }
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleGoogleLogin = () => {
-    setAuthError('Google Sign-In coming soon!');
-  };
-
   return (
     <SafeAreaView style={styles.container}>
-      <KeyboardAvoidingView 
-        style={styles.keyboardView} 
+      <KeyboardAvoidingView
+        style={styles.kb}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 64 : 0}
       >
-        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+        <ScrollView
+          contentContainerStyle={styles.scroll}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          <View style={styles.brand}>
+            <VoltMark size={48} />
+          </View>
+
           <View style={styles.header}>
-            <Text variant="headingLg" style={styles.title}>Create Account</Text>
-            <Text variant="body" color={COLORS.textSecondary}>Join the accountability revolution.</Text>
+            <Text variant="headingLg" color={COLORS.inkDisplay}>Create your account</Text>
+            <Text variant="body" color={COLORS.inkSecondary} style={styles.subtitle}>
+              It takes about thirty seconds.
+            </Text>
           </View>
 
           <View style={styles.form}>
@@ -103,7 +92,8 @@ export default function RegisterScreen({ navigation }: any) {
               render={({ field: { onChange, onBlur, value } }) => (
                 <Input
                   label="Email"
-                  placeholder="Enter your email"
+                  placeholder="you@email.com"
+                  leadingIcon="user"
                   autoCapitalize="none"
                   keyboardType="email-address"
                   onBlur={onBlur}
@@ -113,17 +103,16 @@ export default function RegisterScreen({ navigation }: any) {
                 />
               )}
             />
-
-            <View style={styles.spacer} />
-
+            <View style={{ height: 14 }} />
             <Controller
               control={control}
               name="password"
               render={({ field: { onChange, onBlur, value } }) => (
                 <Input
                   label="Password"
-                  placeholder="Create a password"
+                  placeholder="At least 6 characters"
                   secureTextEntry
+                  hint="6+ characters, mix it up"
                   onBlur={onBlur}
                   onChangeText={onChange}
                   value={value}
@@ -131,15 +120,13 @@ export default function RegisterScreen({ navigation }: any) {
                 />
               )}
             />
-
-            <View style={styles.spacer} />
-
+            <View style={{ height: 14 }} />
             <Controller
               control={control}
               name="confirmPassword"
               render={({ field: { onChange, onBlur, value } }) => (
                 <Input
-                  label="Confirm Password"
+                  label="Confirm password"
                   placeholder="Type it again"
                   secureTextEntry
                   onBlur={onBlur}
@@ -151,32 +138,26 @@ export default function RegisterScreen({ navigation }: any) {
             />
 
             {authError && (
-              <Text variant="body" color={COLORS.danger} style={styles.errorText}>
+              <Text variant="bodySm" color={COLORS.danger} style={styles.errorText}>
                 {authError}
               </Text>
             )}
 
-            <Button 
-              label={isLoading ? "Creating account..." : "Sign Up"} 
-              onPress={handleSubmit(onSubmit)} 
-              style={styles.registerBtn}
+            <Button
+              label={isLoading ? 'Creating account…' : 'Create account'}
+              onPress={handleSubmit(onSubmit)}
               disabled={isLoading}
-            />
-
-            <Text style={styles.orText} color={COLORS.textSecondary}>OR</Text>
-
-            <Button 
-              label="Sign up with Google" 
-              variant="secondary"
-              onPress={handleGoogleLogin} 
-              style={styles.googleBtn}
+              loading={isLoading}
+              fullWidth
+              size="lg"
+              style={styles.submit}
             />
           </View>
 
           <View style={styles.footer}>
-            <Text color={COLORS.textSecondary}>Already have an account? </Text>
+            <Text variant="body" color={COLORS.inkSecondary}>Have an account? </Text>
             <Pressable onPress={() => navigation.navigate('Login')}>
-              <Text color={COLORS.brandPrimary} style={styles.linkText}>Log in</Text>
+              <Text variant="bodyMedium" color={COLORS.accent}>Sign in</Text>
             </Pressable>
           </View>
         </ScrollView>
@@ -186,52 +167,23 @@ export default function RegisterScreen({ navigation }: any) {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.surfaceBase,
-  },
-  keyboardView: {
-    flex: 1,
-  },
-  scrollContent: {
+  container: { flex: 1, backgroundColor: COLORS.surfaceBase },
+  kb: { flex: 1 },
+  scroll: {
     paddingHorizontal: 24,
-    paddingTop: 40,
+    paddingTop: 24,
     paddingBottom: 40,
     flexGrow: 1,
-    justifyContent: 'center',
   },
-  header: {
-    marginBottom: 40,
-  },
-  title: {
-    marginBottom: 8,
-  },
-  form: {
-    width: '100%',
-  },
-  spacer: {
-    height: 16,
-  },
-  errorText: {
-    marginTop: 8,
-    textAlign: 'center',
-  },
-  registerBtn: {
-    marginTop: 24,
-  },
-  orText: {
-    textAlign: 'center',
-    marginVertical: 16,
-  },
-  googleBtn: {
-    marginBottom: 24,
-  },
+  brand: { alignItems: 'center', marginTop: 8, marginBottom: 40 },
+  header: { marginBottom: 28 },
+  subtitle: { marginTop: 6 },
+  form: { width: '100%' },
+  errorText: { marginTop: 12, textAlign: 'center' },
+  submit: { marginTop: 24 },
   footer: {
     flexDirection: 'row',
     justifyContent: 'center',
     marginTop: 32,
-  },
-  linkText: {
-    fontFamily: 'Inter-SemiBold',
   },
 });

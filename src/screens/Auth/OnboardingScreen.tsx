@@ -1,30 +1,41 @@
 import React, { useRef, useState } from 'react';
 import { View, StyleSheet, FlatList, Dimensions, Animated, Pressable } from 'react-native';
-import { Text, Button } from '@/components/ui';
-import { COLORS, SIZES } from '@/constants/theme';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Text, Button, Icon, IconName } from '@/components/ui';
+import { COLORS, RADIUS } from '@/constants/theme';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width } = Dimensions.get('window');
 
-const ONBOARDING_DATA = [
+interface Slide {
+  id: string;
+  title: string;
+  description: string;
+  icon: IconName;
+  accent: string;
+}
+
+const ONBOARDING_DATA: Slide[] = [
   {
     id: '1',
-    title: 'Track Together',
-    description: 'Join your friends and keep each other accountable every single day.',
-    icon: '🤝',
+    title: 'Track together',
+    description: 'Join a pact of up to six people. Show up daily. Hold each other to the standard.',
+    icon: 'users',
+    accent: '#FF5B1F',
   },
   {
     id: '2',
-    title: 'Stay Accountable',
-    description: 'See the green dots fill up your calendar. Miss a day, break the streak.',
-    icon: '🔥',
+    title: 'Build the streak',
+    description: 'A green dot every day. Miss one, and the streak resets. The calendar is the scoreboard.',
+    icon: 'flame',
+    accent: '#2E9D6A',
   },
   {
     id: '3',
-    title: 'Level Up',
-    description: 'Earn XP, unlock badges, and become a legend in your group.',
-    icon: '⭐',
+    title: 'Earn your level',
+    description: 'Every submission adds XP. Climb the ranks. Unlock badges. Become a legend in your pact.',
+    icon: 'crown',
+    accent: '#FF5B1F',
   },
 ];
 
@@ -34,12 +45,10 @@ export default function OnboardingScreen({ navigation }: any) {
   const flatListRef = useRef<FlatList>(null);
 
   const viewableItemsChanged = useRef(({ viewableItems }: any) => {
-    if (viewableItems[0]) {
-      setCurrentIndex(viewableItems[0].index);
-    }
+    if (viewableItems[0]) setCurrentIndex(viewableItems[0].index);
   }).current;
 
-  const viewConfig = useRef({ viewAreaCoveragePercentThreshold: 50 }).current;
+  const viewConfig = useRef({ viewAreaCoveragePercentThreshold: 60 }).current;
 
   const handleComplete = async () => {
     await AsyncStorage.setItem('onboarding_completed', 'true');
@@ -54,24 +63,49 @@ export default function OnboardingScreen({ navigation }: any) {
     }
   };
 
-  const renderItem = ({ item, index }: any) => {
-    // Parallax effect
+  const renderItem = ({ item, index }: { item: Slide; index: number }) => {
+    const inputRange = [(index - 1) * width, index * width, (index + 1) * width];
     const translateX = scrollX.interpolate({
-      inputRange: [(index - 1) * width, index * width, (index + 1) * width],
-      outputRange: [width * 0.5, 0, -width * 0.5],
+      inputRange,
+      outputRange: [width * 0.3, 0, -width * 0.3],
+    });
+    const opacity = scrollX.interpolate({
+      inputRange,
+      outputRange: [0, 1, 0],
+      extrapolate: 'clamp',
+    });
+    const scale = scrollX.interpolate({
+      inputRange,
+      outputRange: [0.86, 1, 0.86],
+      extrapolate: 'clamp',
     });
 
     return (
       <View style={styles.slide}>
-        <Animated.View style={[styles.imageContainer, { transform: [{ translateX }] }]}>
-          <Text style={styles.emoji}>{item.icon}</Text>
+        <Animated.View
+          style={[
+            styles.illustration,
+            { transform: [{ translateX }, { scale }] },
+          ]}
+        >
+          <View style={[styles.illustrationCore, { backgroundColor: hexToTint(item.accent, 0.10) }]}>
+            <View style={[styles.illustrationInner, { backgroundColor: hexToTint(item.accent, 0.20) }]}>
+              <Icon name={item.icon} size={84} color={item.accent} bold />
+            </View>
+          </View>
         </Animated.View>
-        <View style={styles.textContainer}>
-          <Text variant="headingLg" style={styles.title}>{item.title}</Text>
-          <Text variant="body" color={COLORS.textSecondary} style={styles.description}>
+
+        <Animated.View style={[styles.text, { opacity }]}>
+          <Text variant="eyebrow" color={COLORS.inkSecondary} style={styles.step}>
+            Step {index + 1} of {ONBOARDING_DATA.length}
+          </Text>
+          <Text variant="displayMd" color={COLORS.inkDisplay} style={styles.title}>
+            {item.title}
+          </Text>
+          <Text variant="body" color={COLORS.inkSecondary} style={styles.description}>
             {item.description}
           </Text>
-        </View>
+        </Animated.View>
       </View>
     );
   };
@@ -79,10 +113,12 @@ export default function OnboardingScreen({ navigation }: any) {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        {currentIndex < ONBOARDING_DATA.length - 1 && (
-          <Pressable onPress={handleComplete} style={styles.skipBtn}>
-            <Text variant="body" color={COLORS.textSecondary}>Skip</Text>
+        {currentIndex < ONBOARDING_DATA.length - 1 ? (
+          <Pressable onPress={handleComplete} hitSlop={8}>
+            <Text variant="label" color={COLORS.inkSecondary}>Skip</Text>
           </Pressable>
+        ) : (
+          <View />
         )}
       </View>
 
@@ -90,46 +126,61 @@ export default function OnboardingScreen({ navigation }: any) {
         ref={flatListRef}
         data={ONBOARDING_DATA}
         renderItem={renderItem}
+        keyExtractor={item => item.id}
         horizontal
-        showsHorizontalScrollIndicator={false}
         pagingEnabled
+        showsHorizontalScrollIndicator={false}
         bounces={false}
-        keyExtractor={(item) => item.id}
-        onScroll={Animated.event([{ nativeEvent: { contentOffset: { x: scrollX } } }], {
-          useNativeDriver: false,
-        })}
+        onScroll={Animated.event([{ nativeEvent: { contentOffset: { x: scrollX } } }], { useNativeDriver: false })}
         onViewableItemsChanged={viewableItemsChanged}
         viewabilityConfig={viewConfig}
-        scrollEventThrottle={32}
+        scrollEventThrottle={16}
       />
 
       <View style={styles.footer}>
-        <View style={styles.dotContainer}>
+        <View style={styles.dots}>
           {ONBOARDING_DATA.map((_, i) => {
+            const inputRange = [(i - 1) * width, i * width, (i + 1) * width];
             const dotWidth = scrollX.interpolate({
-              inputRange: [(i - 1) * width, i * width, (i + 1) * width],
-              outputRange: [10, 24, 10],
+              inputRange,
+              outputRange: [8, 28, 8],
               extrapolate: 'clamp',
             });
-            const backgroundColor = scrollX.interpolate({
-              inputRange: [(i - 1) * width, i * width, (i + 1) * width],
-              outputRange: [COLORS.surfaceDark, COLORS.brandPrimary, COLORS.surfaceDark],
+            const dotOpacity = scrollX.interpolate({
+              inputRange,
+              outputRange: [0.3, 1, 0.3],
               extrapolate: 'clamp',
             });
             return (
-              <Animated.View key={i.toString()} style={[styles.dot, { width: dotWidth, backgroundColor }]} />
+              <Animated.View
+                key={i.toString()}
+                style={[
+                  styles.dot,
+                  { width: dotWidth, opacity: dotOpacity, backgroundColor: COLORS.inkDisplay },
+                ]}
+              />
             );
           })}
         </View>
 
         <Button
-          label={currentIndex === ONBOARDING_DATA.length - 1 ? "Get Started" : "Next"}
+          label={currentIndex === ONBOARDING_DATA.length - 1 ? 'Get started' : 'Next'}
           onPress={handleNext}
-          style={styles.button}
+          fullWidth
+          size="lg"
+          trailingIcon="arrow-right"
         />
       </View>
     </SafeAreaView>
   );
+}
+
+function hexToTint(hex: string, alpha: number) {
+  const h = hex.replace('#', '');
+  const r = parseInt(h.substring(0, 2), 16);
+  const g = parseInt(h.substring(2, 4), 16);
+  const b = parseInt(h.substring(4, 6), 16);
+  return `rgba(${r},${g},${b},${alpha})`;
 }
 
 const styles = StyleSheet.create({
@@ -138,62 +189,66 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.surfaceBase,
   },
   header: {
-    height: 60,
-    justifyContent: 'center',
-    alignItems: 'flex-end',
+    height: 56,
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
     paddingHorizontal: 24,
-  },
-  skipBtn: {
-    padding: 8,
   },
   slide: {
     width,
-    alignItems: 'center',
     paddingHorizontal: 32,
+    alignItems: 'center',
   },
-  imageContainer: {
-    width: width - 80,
-    height: width - 80,
-    backgroundColor: COLORS.surfaceDark,
-    borderRadius: SIZES.radiusScreen,
+  illustration: {
+    marginTop: 40,
+    marginBottom: 56,
+    alignItems: 'center',
     justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.05)',
-    marginVertical: SIZES.padding * 2,
   },
-  emoji: {
-    fontSize: 120,
-  },
-  textContainer: {
-    flex: 1,
+  illustrationCore: {
+    width: width - 120,
+    height: width - 120,
+    borderRadius: 999,
     alignItems: 'center',
+    justifyContent: 'center',
+  },
+  illustrationInner: {
+    width: width - 200,
+    height: width - 200,
+    borderRadius: 999,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  text: {
+    alignItems: 'center',
+  },
+  step: {
+    marginBottom: 12,
   },
   title: {
-    marginBottom: 16,
     textAlign: 'center',
+    marginBottom: 14,
   },
   description: {
     textAlign: 'center',
-    lineHeight: 24,
+    lineHeight: 26,
+    maxWidth: 320,
   },
   footer: {
-    height: 120,
-    paddingHorizontal: 32,
-    justifyContent: 'space-between',
-    paddingBottom: 32,
+    paddingHorizontal: 24,
+    paddingBottom: 24,
+    paddingTop: 16,
+    gap: 28,
   },
-  dotContainer: {
+  dots: {
     flexDirection: 'row',
     justifyContent: 'center',
-    marginBottom: 24,
+    alignItems: 'center',
+    gap: 6,
   },
   dot: {
-    height: 10,
-    borderRadius: 5,
-    marginHorizontal: 6,
-  },
-  button: {
-    width: '100%',
+    height: 8,
+    borderRadius: 4,
   },
 });

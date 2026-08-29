@@ -1,44 +1,57 @@
 import React, { useEffect, useRef } from 'react';
 import { View, StyleSheet, Animated, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Text } from '@/components/ui';
-import { COLORS, SHADOWS } from '@/constants/theme';
+import { Text, Icon, IconName } from '@/components/ui';
+import { COLORS, RADIUS } from '@/constants/theme';
 import * as Linking from 'expo-linking';
 import { useAuthStore } from '@/store/useAuthStore';
 import { firebaseAuth } from '@/services/firebase';
 
+interface Choice {
+  id: 'create' | 'join' | 'skip';
+  title: string;
+  description: string;
+  icon: IconName;
+  iconBg: string;
+  iconColor: string;
+}
+
+const CHOICES: Choice[] = [
+  {
+    id: 'create',
+    title: 'Start a pact',
+    description: 'Create a new group and invite friends with a code.',
+    icon: 'sparkle',
+    iconBg: COLORS.accentTint,
+    iconColor: COLORS.accent,
+  },
+  {
+    id: 'join',
+    title: 'Join a pact',
+    description: 'Enter an invite code from a friend.',
+    icon: 'users',
+    iconBg: COLORS.positiveTint,
+    iconColor: COLORS.positive,
+  },
+];
+
 export default function JoinOrCreateScreen({ navigation }: any) {
   const { setUser } = useAuthStore();
-  const slideAnim1 = useRef(new Animated.Value(50)).current;
-  const slideAnim2 = useRef(new Animated.Value(50)).current;
-  const fadeAnim1 = useRef(new Animated.Value(0)).current;
-  const fadeAnim2 = useRef(new Animated.Value(0)).current;
+  const s1 = useRef(new Animated.Value(0)).current;
+  const s2 = useRef(new Animated.Value(0)).current;
+  const s3 = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    // Check for initial deep link invite code
-    Linking.getInitialURL().then(url => {
-      if (url) {
-        handleDeepLink({ url });
-      }
-    });
+    Linking.getInitialURL().then(url => { if (url) handleDeepLink({ url }); });
+    const sub = Linking.addEventListener('url', handleDeepLink);
 
-    const subscription = Linking.addEventListener('url', handleDeepLink);
-
-    // Staggered animated entrance
-    Animated.stagger(200, [
-      Animated.parallel([
-        Animated.spring(slideAnim1, { toValue: 0, useNativeDriver: true }),
-        Animated.timing(fadeAnim1, { toValue: 1, duration: 300, useNativeDriver: true }),
-      ]),
-      Animated.parallel([
-        Animated.spring(slideAnim2, { toValue: 0, useNativeDriver: true }),
-        Animated.timing(fadeAnim2, { toValue: 1, duration: 300, useNativeDriver: true }),
-      ]),
+    Animated.stagger(80, [
+      Animated.spring(s1, { toValue: 1, useNativeDriver: true, damping: 18, stiffness: 200 }),
+      Animated.spring(s2, { toValue: 1, useNativeDriver: true, damping: 18, stiffness: 200 }),
+      Animated.spring(s3, { toValue: 1, useNativeDriver: true, damping: 18, stiffness: 200 }),
     ]).start();
 
-    return () => {
-      subscription.remove();
-    };
+    return () => sub.remove();
   }, []);
 
   const completeAuth = () => {
@@ -46,128 +59,118 @@ export default function JoinOrCreateScreen({ navigation }: any) {
     setUser({
       id: user?.uid || 'new-user',
       email: user?.email || '',
-      displayName: user?.displayName || 'New User',
-      username: 'NewUser',
+      displayName: user?.displayName || 'You',
+      username: 'You',
       avatarUrl: user?.photoURL || null,
-      level: 1,
-      xp: 0,
-      shieldsAvailable: 3,
-      totalSubmissions: 0,
-      longestStreak: 0,
+      level: 1, xp: 0, shieldsAvailable: 3,
+      totalSubmissions: 0, longestStreak: 0,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     });
   };
 
-  const handleDeepLink = (event: { url: string }) => {
-    let data = Linking.parse(event.url);
+  const handleDeepLink = (e: { url: string }) => {
+    const data = Linking.parse(e.url);
     if (data.path === 'invite' && data.queryParams?.code) {
-      // TODO: Handle invite code logic directly
-      // navigate to Join with code
-      completeAuth(); // Fallback for now
+      completeAuth();
+      navigation.replace('JoinGroup', { code: data.queryParams.code });
     }
   };
 
-  const handleJoin = () => {
-    // Ideally this goes to a "JoinGroup" modal or flow, but we can navigate to Main for now
+  const handleSelect = (choice: Choice['id']) => {
     completeAuth();
-  };
-
-  const handleCreate = () => {
-    // Ideally this goes to a "CreateGroup" modal or flow, but we can navigate to Main for now
-    completeAuth();
+    if (choice === 'create') navigation.replace('CreateGroup');
+    else if (choice === 'join') navigation.replace('JoinGroup');
   };
 
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <Text variant="headingLg" style={styles.title}>Join a Pact</Text>
-        <Text variant="body" color={COLORS.textSecondary} style={styles.description}>
-          StreakPact is better with friends. Choose how you want to start.
+        <Text variant="eyebrow" color={COLORS.inkSecondary}>Almost there</Text>
+        <Text variant="displaySm" color={COLORS.inkDisplay} style={styles.title}>
+          Join a pact
+        </Text>
+        <Text variant="body" color={COLORS.inkSecondary} style={styles.description}>
+          StreakPact works best with a small group. Pick how you want to start.
         </Text>
       </View>
 
-      <View style={styles.cardsContainer}>
-        <Animated.View style={{ opacity: fadeAnim1, transform: [{ translateY: slideAnim1 }] }}>
-          <Pressable style={styles.card} onPress={handleCreate}>
-            <View style={[styles.iconContainer, { backgroundColor: COLORS.brandPrimary + '20' }]}>
-              <Text style={styles.icon}>✨</Text>
-            </View>
-            <View style={styles.cardText}>
-              <Text variant="headingLg">Start a Pact</Text>
-              <Text variant="body" color={COLORS.textSecondary}>Create a new group and invite friends</Text>
-            </View>
-          </Pressable>
-        </Animated.View>
+      <View style={styles.cards}>
+        {CHOICES.map((c, i) => (
+          <Animated.View
+            key={c.id}
+            style={{
+              opacity: i === 0 ? s1 : i === 1 ? s2 : s3,
+              transform: [
+                {
+                  translateY: (i === 0 ? s1 : i === 1 ? s2 : s3).interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [20, 0],
+                  }),
+                },
+              ],
+            }}
+          >
+            <Pressable
+              style={({ pressed }) => [styles.card, pressed ? styles.cardPressed : null]}
+              onPress={() => handleSelect(c.id)}
+              accessibilityRole="button"
+              accessibilityLabel={c.title}
+            >
+              <View style={[styles.cardIcon, { backgroundColor: c.iconBg }]}>
+                <Icon name={c.icon} size={28} color={c.iconColor} />
+              </View>
+              <View style={styles.cardBody}>
+                <Text variant="headingMd" color={COLORS.inkDisplay}>{c.title}</Text>
+                <Text variant="bodySm" color={COLORS.inkSecondary} style={styles.cardDesc}>
+                  {c.description}
+                </Text>
+              </View>
+              <Icon name="caret-right" size={18} color={COLORS.inkTertiary} />
+            </Pressable>
+          </Animated.View>
+        ))}
+      </View>
 
-        <Animated.View style={{ opacity: fadeAnim2, transform: [{ translateY: slideAnim2 }] }}>
-          <Pressable style={styles.card} onPress={handleJoin}>
-            <View style={[styles.iconContainer, { backgroundColor: COLORS.success + '20' }]}>
-              <Text style={styles.icon}>🤝</Text>
-            </View>
-            <View style={styles.cardText}>
-              <Text variant="headingLg">Join a Pact</Text>
-              <Text variant="body" color={COLORS.textSecondary}>Enter an invite code from a friend</Text>
-            </View>
-          </Pressable>
-        </Animated.View>
-      </View>
-      
-      <View style={styles.footer}>
-        <Pressable onPress={completeAuth}>
-          <Text variant="body" color={COLORS.textSecondary}>Skip for now</Text>
+      <Animated.View style={[styles.footer, { opacity: s3 }]}>
+        <Pressable onPress={completeAuth} hitSlop={8}>
+          <Text variant="label" color={COLORS.inkSecondary}>Skip for now</Text>
         </Pressable>
-      </View>
+      </Animated.View>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.surfaceBase,
-    paddingHorizontal: 24,
-  },
-  header: {
-    marginTop: 60,
-    marginBottom: 40,
-  },
-  title: {
-    marginBottom: 8,
-  },
-  description: {
-    lineHeight: 24,
-  },
-  cardsContainer: {
-    flex: 1,
-  },
+  container: { flex: 1, backgroundColor: COLORS.surfaceBase, paddingHorizontal: 24 },
+  header: { marginTop: 24, marginBottom: 32 },
+  title: { marginTop: 8, marginBottom: 8 },
+  description: { lineHeight: 24, maxWidth: 360 },
+  cards: { flex: 1, gap: 14 },
   card: {
     flexDirection: 'row',
-    backgroundColor: COLORS.surfaceBase,
-    borderRadius: 20,
-    padding: 24,
-    marginBottom: 20,
     alignItems: 'center',
-    ...SHADOWS.mediumElevation,
+    backgroundColor: COLORS.surfaceElevated,
+    borderRadius: RADIUS.lg,
+    padding: 20,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.05)',
+    borderColor: COLORS.hairline,
+    gap: 16,
   },
-  iconContainer: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+  cardPressed: {
+    backgroundColor: COLORS.surfaceSunken,
+  },
+  cardIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: RADIUS.md,
+    alignItems: 'center',
     justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 20,
   },
-  icon: {
-    fontSize: 32,
-  },
-  cardText: {
-    flex: 1,
-  },
+  cardBody: { flex: 1 },
+  cardDesc: { marginTop: 4, lineHeight: 20 },
   footer: {
-    paddingVertical: 32,
     alignItems: 'center',
+    paddingVertical: 24,
   },
 });
