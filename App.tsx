@@ -1,7 +1,8 @@
 import React, { useCallback } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, DarkTheme, DefaultTheme, Theme } from '@react-navigation/native';
+import { useColorScheme } from 'react-native';
 import {
   useFonts,
   Inter_400Regular,
@@ -10,19 +11,24 @@ import {
   Inter_700Bold,
 } from '@expo-google-fonts/inter';
 import {
-  RobotoMono_500Medium,
-  RobotoMono_700Bold,
-} from '@expo-google-fonts/roboto-mono';
+  SpaceGrotesk_500Medium,
+  SpaceGrotesk_600SemiBold,
+  SpaceGrotesk_700Bold,
+} from '@expo-google-fonts/space-grotesk';
+import {
+  JetBrainsMono_400Regular,
+  JetBrainsMono_500Medium,
+  JetBrainsMono_700Bold,
+} from '@expo-google-fonts/jetbrains-mono';
 import * as SplashScreen from 'expo-splash-screen';
 import { View } from 'react-native';
 import { QueryClientProvider } from '@tanstack/react-query';
 import RootNavigator from './src/navigation';
 import { queryClient } from './src/services/queryClient';
+import { lightColors, darkColors, COLORS } from './constants/theme';
 
-// Keep the splash screen visible while fonts load
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
-// Deep link config for invite codes and group navigation: streakpact://...
 const linking: any = {
   prefixes: ['streakpact://', 'exp://'],
   config: {
@@ -56,14 +62,38 @@ const linking: any = {
   },
 };
 
+function buildNavTheme(isDark: boolean): Theme {
+  const palette = isDark ? darkColors : lightColors;
+  return {
+    ...(isDark ? DarkTheme : DefaultTheme),
+    colors: {
+      ...(isDark ? DarkTheme.colors : DefaultTheme.colors),
+      background: palette.surfaceBase,
+      card: palette.surfaceElevated,
+      text: palette.inkDisplay,
+      border: palette.hairline,
+      primary: palette.accent,
+      notification: palette.accent,
+    },
+  };
+}
+
 export default function App() {
+  const systemScheme = useColorScheme();
+  const isDark = systemScheme === 'dark';
+  const palette = isDark ? darkColors : lightColors;
+
   const [fontsLoaded, fontError] = useFonts({
     'Inter-Regular': Inter_400Regular,
     'Inter-Medium': Inter_500Medium,
     'Inter-SemiBold': Inter_600SemiBold,
     'Inter-Bold': Inter_700Bold,
-    'RobotoMono-Medium': RobotoMono_500Medium,
-    'RobotoMono-Bold': RobotoMono_700Bold,
+    'SpaceGrotesk-Medium': SpaceGrotesk_500Medium,
+    'SpaceGrotesk-SemiBold': SpaceGrotesk_600SemiBold,
+    'SpaceGrotesk-Bold': SpaceGrotesk_700Bold,
+    'JetBrainsMono-Regular': JetBrainsMono_400Regular,
+    'JetBrainsMono-Medium': JetBrainsMono_500Medium,
+    'JetBrainsMono-Bold': JetBrainsMono_700Bold,
   });
 
   const onLayoutRootView = useCallback(async () => {
@@ -79,11 +109,11 @@ export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <SafeAreaProvider>
-        <View style={{ flex: 1 }} onLayout={onLayoutRootView}>
-          <NavigationContainer linking={linking}>
+        <View style={{ flex: 1, backgroundColor: palette.surfaceBase }} onLayout={onLayoutRootView}>
+          <NavigationContainer theme={buildNavTheme(isDark)} linking={linking}>
             <RootNavigator />
           </NavigationContainer>
-          <StatusBar style="dark" />
+          <StatusBar style={isDark ? 'light' : 'dark'} />
         </View>
       </SafeAreaProvider>
     </QueryClientProvider>
