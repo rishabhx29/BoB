@@ -4,13 +4,17 @@ import AuthNavigator from './AuthNavigator';
 import MainTabNavigator from './MainTabNavigator';
 import { useAuthStore } from '@/store/useAuthStore';
 
+import { RootStackParamList } from '@/types';
+
 // Group Screens
 import CreateGroupScreen from '@/screens/Groups/CreateGroupScreen';
 import JoinGroupScreen from '@/screens/Groups/JoinGroupScreen';
 import GroupHomeScreen from '@/screens/Groups/GroupHomeScreen';
 import GroupSettingsScreen from '@/screens/Groups/GroupSettingsScreen';
+import CreateActivityScreen from '@/screens/Groups/CreateActivityScreen';
+import ActivityDetailScreen from '@/screens/Groups/ActivityDetailScreen';
 
-const Stack = createNativeStackNavigator();
+const Stack = createNativeStackNavigator<RootStackParamList>();
 
 export default function RootNavigator() {
   const { isAuthenticated } = useAuthStore(); 
@@ -42,6 +46,16 @@ export default function RootNavigator() {
           <Stack.Screen 
             name="GroupSettings" 
             component={GroupSettingsScreen} 
+            options={{ animation: 'slide_from_right' }}
+          />
+          <Stack.Screen 
+            name="CreateActivity" 
+            component={CreateActivityScreen} 
+            options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
+          />
+          <Stack.Screen 
+            name="ActivityDetail" 
+            component={ActivityDetailScreen} 
             options={{ animation: 'slide_from_right' }}
           />
         </>

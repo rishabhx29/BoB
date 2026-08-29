@@ -7,8 +7,9 @@ import RegisterScreen from '../screens/Auth/RegisterScreen';
 import SetupProfileScreen from '../screens/Auth/SetupProfileScreen';
 import JoinOrCreateScreen from '../screens/Auth/JoinOrCreateScreen';
 import BiometricSetupScreen from '../screens/Auth/BiometricSetupScreen';
+import { AuthStackParamList } from '@/types';
 
-const Stack = createNativeStackNavigator();
+const Stack = createNativeStackNavigator<AuthStackParamList>();
 
 export default function AuthNavigator() {
   return (

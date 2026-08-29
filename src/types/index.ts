@@ -225,6 +225,8 @@ export interface ActivitySeed {
   name: string;
   icon: string;
   color: string;
+  templateKey?: string | null;
+  templateFields?: FieldDefinition[];
   frequency: ActivityFrequency;
   frequencyDays: number[];        // 0=Sun … 6=Sat
   requirePhoto: boolean;
@@ -234,6 +236,8 @@ export interface AddActivityInput {
   name: string;
   icon: string;
   color: string;
+  templateKey?: string | null;
+  templateFields?: FieldDefinition[];
   frequency?: ActivityFrequency;
   frequencyDays?: number[];
   requirePhoto?: boolean;
@@ -247,4 +251,41 @@ export interface UpdateGroupInput {
   submissionWindowStart?: string; // HH:MM
   submissionWindowEnd?: string;   // HH:MM
   groupStreakEnabled?: boolean;
+}
+
+// ─── Navigation Param Types ──────────────────────────────────────────────────
+
+export type AuthStackParamList = {
+  Splash: undefined;
+  Onboarding: undefined;
+  Login: undefined;
+  Register: undefined;
+  SetupProfile: undefined;
+  JoinOrCreate: undefined;
+  BiometricSetup: undefined;
+};
+
+export type MainTabParamList = {
+  Home: undefined;
+  Groups: undefined;
+  Submit: undefined;
+  Leaderboard: undefined;
+  Profile: undefined;
+};
+
+export type RootStackParamList = {
+  Auth: undefined;
+  Main: undefined;
+  CreateGroup: undefined;
+  JoinGroup: { code?: string } | undefined;
+  GroupHome: { groupId: string; groupName?: string; groupEmoji?: string };
+  GroupSettings: { groupId: string };
+  CreateActivity: { groupId: string };
+  ActivityDetail: { activity?: Activity; groupId?: string };
+};
+
+declare global {
+  namespace ReactNavigation {
+    interface RootParamList extends RootStackParamList {}
+  }
 }

@@ -22,9 +22,9 @@ import { queryClient } from './src/services/queryClient';
 // Keep the splash screen visible while fonts load
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
-// Deep link config for invite codes: streakpact://join/XXXXXX
+// Deep link config for invite codes and group navigation: streakpact://...
 const linking: any = {
-  prefixes: ['streakpact://'],
+  prefixes: ['streakpact://', 'exp://'],
   config: {
     screens: {
       Auth: {
@@ -33,16 +33,25 @@ const linking: any = {
           Onboarding: 'onboarding',
           Login: 'login',
           Register: 'register',
+          SetupProfile: 'setup-profile',
+          JoinOrCreate: 'join-or-create',
+          BiometricSetup: 'biometric-setup',
         },
       },
       Main: {
         screens: {
           Home: 'home',
+          Groups: 'groups',
           Leaderboard: 'leaderboard',
           Profile: 'profile',
         },
       },
       JoinGroup: 'join/:code',
+      CreateGroup: 'create-group',
+      GroupHome: 'group/:groupId',
+      GroupSettings: 'group/:groupId/settings',
+      CreateActivity: 'group/:groupId/create-activity',
+      ActivityDetail: 'group/:groupId/activity',
     },
   },
 };
