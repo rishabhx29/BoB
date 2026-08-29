@@ -41,8 +41,10 @@ export default function CreateActivityScreen() {
         name: selectedTemplate.name,
         icon: selectedTemplate.icon,
         color: selectedTemplate.color,
+        templateKey: selectedTemplate.id,
+        templateFields: selectedTemplate.templateFields,
         frequency: frequency,
-        frequencyDays: frequency === 'daily' ? [0, 1, 2, 3, 4, 5, 6] : [1, 3, 5], // Mocking specific days for now
+        frequencyDays: frequency === 'daily' ? [0, 1, 2, 3, 4, 5, 6] : [1, 3, 5],
         requirePhoto: requirePhoto,
       });
       navigation.goBack();

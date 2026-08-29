@@ -5,6 +5,7 @@ export interface ActivityTemplate extends ActivitySeed {
   id: string; // e.g. "gym", "study"
   description: string;
   templateFields: FieldDefinition[];
+  fields?: FieldDefinition[];
 }
 
 export const PRESET_ACTIVITIES: ActivityTemplate[] = [

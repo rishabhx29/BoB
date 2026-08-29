@@ -148,8 +148,8 @@ async function insertActivities(
     frequency: seed.frequency,
     frequency_days: seed.frequencyDays,
     require_photo: seed.requirePhoto,
-    template_key: null,
-    template_fields: [],
+    template_key: seed.templateKey ?? null,
+    template_fields: seed.templateFields ?? [],
     created_by: userId,
   }));
   const { error } = await supabase.from('activities').insert(rows);
@@ -504,8 +504,8 @@ export async function addActivity(
         frequency: input.frequency ?? 'daily',
         frequency_days: input.frequencyDays ?? [0, 1, 2, 3, 4, 5, 6],
         require_photo: input.requirePhoto ?? false,
-        template_key: null,
-        template_fields: [],
+        template_key: input.templateKey ?? null,
+        template_fields: input.templateFields ?? [],
         created_by: userId,
       })
       .select()
