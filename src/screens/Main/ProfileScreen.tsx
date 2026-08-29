@@ -63,7 +63,7 @@ export default function ProfileScreen() {
             </View>
           </View>
           
-          <Button title="Edit Profile" variant="outline" style={styles.editBtn} />
+          <Button label="Edit Profile" variant="secondary" style={styles.editBtn} />
         </View>
 
         {/* Stats Grid */}

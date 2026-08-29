@@ -26,6 +26,7 @@ type RegisterForm = z.infer<typeof registerSchema>;
 export default function RegisterScreen({ navigation }: any) {
   const [authError, setAuthError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const { setUser } = useAuthStore();
 
   const {
     control,

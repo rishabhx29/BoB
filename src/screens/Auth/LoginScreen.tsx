@@ -9,6 +9,7 @@ import { z } from 'zod';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { firebaseAuth } from '@/services/firebase';
 import { useAuthStore } from '@/store/useAuthStore';
+import * as SecureStore from 'expo-secure-store';
 import { storage } from '@/utils/storage';
 
 const loginSchema = z.object({
