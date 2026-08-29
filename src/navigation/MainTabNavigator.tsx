@@ -1,58 +1,69 @@
 import React, { useRef, useState } from 'react';
-import { View, TouchableOpacity, Text, StyleSheet, Platform, Animated } from 'react-native';
+import { View, Pressable, Platform, StyleSheet, Animated } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { Ionicons } from '@expo/vector-icons';
 import HomeScreen from '../screens/Main/HomeScreen';
 import GroupsScreen from '../screens/Main/GroupsScreen';
 import LeaderboardScreen from '../screens/Main/LeaderboardScreen';
 import ProfileScreen from '../screens/Main/ProfileScreen';
-import { COLORS, SHADOWS, SIZES } from '@/constants/theme';
+import { COLORS, SHADOWS, RADIUS, EASE } from '@/constants/theme';
 import { MainTabParamList } from '@/types';
+import { Icon, IconName } from '@/components/ui';
 import * as Haptics from 'expo-haptics';
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
-// Placeholder for Submit Screen / Bottom Sheet Action
+// The center Submit tab doesn't have its own screen — it triggers a modal/sheet flow
 const SubmitPlaceholder = () => null;
 
-const TactileSubmitPill = ({ onPress }: { onPress: () => void }) => {
-  const [isPressed, setIsPressed] = useState(false);
-  const translateY = useRef(new Animated.Value(0)).current;
+interface TactileSubmitProps {
+  onPress: () => void;
+}
 
-  const handlePressIn = () => {
-    setIsPressed(true);
-    Animated.spring(translateY, { toValue: 3, useNativeDriver: true, speed: 60 }).start();
+function TactileSubmitPill({ onPress }: TactileSubmitProps) {
+  const [pressed, setPressed] = useState(false);
+  const scale = useRef(new Animated.Value(1)).current;
+
+  const pressIn = () => {
+    setPressed(true);
+    Animated.spring(scale, { toValue: 0.92, useNativeDriver: true, damping: 18, stiffness: 320 }).start();
   };
-
-  const handlePressOut = () => {
-    setIsPressed(false);
-    Animated.spring(translateY, { toValue: 0, useNativeDriver: true, speed: 60 }).start();
+  const pressOut = () => {
+    setPressed(false);
+    Animated.spring(scale, { toValue: 1, useNativeDriver: true, damping: 18, stiffness: 320 }).start();
   };
-
-  const handlePress = () => {
-    try {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    } catch {}
+  const handle = () => {
+    try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); } catch {}
     onPress();
   };
 
   return (
-    <Animated.View style={[styles.submitPillWrapper, { transform: [{ translateY }] }]}>
-      <TouchableOpacity
-        activeOpacity={1}
-        onPressIn={handlePressIn}
-        onPressOut={handlePressOut}
-        onPress={handlePress}
-        style={[
-          styles.submitPill,
-          isPressed ? SHADOWS.fabPressed : SHADOWS.fabDefault,
-        ]}
-      >
-        <Ionicons name="add" size={28} color="#FFFFFF" />
-      </TouchableOpacity>
-    </Animated.View>
+    <View style={styles.submitWrap}>
+      <Animated.View style={{ transform: [{ scale }] }}>
+        <Pressable
+          onPressIn={pressIn}
+          onPressOut={pressOut}
+          onPress={handle}
+          style={[styles.submitPill, pressed ? styles.submitPillPressed : null]}
+          accessibilityRole="button"
+          accessibilityLabel="Submit"
+        >
+          <Icon name="plus" size={28} color="#FFFFFF" />
+        </Pressable>
+      </Animated.View>
+    </View>
   );
-};
+}
+
+function TabBarIcon({ name, focused }: { name: IconName; focused: boolean }) {
+  return (
+    <Icon
+      name={name}
+      size={22}
+      color={focused ? COLORS.inkDisplay : COLORS.inkTertiary}
+      bold={focused}
+    />
+  );
+}
 
 export default function MainTabNavigator() {
   return (
@@ -60,80 +71,56 @@ export default function MainTabNavigator() {
       screenOptions={{
         headerShown: false,
         tabBarShowLabel: true,
-        tabBarActiveTintColor: COLORS.brandPrimary,
-        tabBarInactiveTintColor: COLORS.textSecondary,
+        tabBarActiveTintColor: COLORS.inkDisplay,
+        tabBarInactiveTintColor: COLORS.inkTertiary,
         tabBarStyle: styles.tabBar,
         tabBarLabelStyle: styles.tabBarLabel,
+        tabBarItemStyle: styles.tabBarItem,
       }}
     >
-      <Tab.Screen 
-        name="Home" 
-        component={HomeScreen} 
+      <Tab.Screen
+        name="Home"
+        component={HomeScreen}
         options={{
           tabBarLabel: 'Home',
-          tabBarIcon: ({ color, focused }) => (
-            <Ionicons 
-              name={focused ? 'flash' : 'flash-outline'} 
-              size={22} 
-              color={color} 
-            />
-          ),
+          tabBarIcon: ({ focused }) => <TabBarIcon name="house" focused={focused} />,
         }}
       />
-      <Tab.Screen 
-        name="Groups" 
-        component={GroupsScreen} 
+      <Tab.Screen
+        name="Groups"
+        component={GroupsScreen}
         options={{
           tabBarLabel: 'Pacts',
-          tabBarIcon: ({ color, focused }) => (
-            <Ionicons 
-              name={focused ? 'people' : 'people-outline'} 
-              size={22} 
-              color={color} 
-            />
-          ),
+          tabBarIcon: ({ focused }) => <TabBarIcon name="users" focused={focused} />,
         }}
       />
-      <Tab.Screen 
-        name="Submit" 
-        component={SubmitPlaceholder} 
+      <Tab.Screen
+        name="Submit"
+        component={SubmitPlaceholder}
         options={({ navigation }: any) => ({
           tabBarLabel: () => null,
           tabBarButton: () => (
-            <TactileSubmitPill 
-              onPress={() => {
-                navigation.navigate('Groups');
-              }} 
-            />
+            <TactileSubmitPill onPress={() => {
+              // Could navigate to a submission sheet, or scroll the groups FAB into view
+              navigation.navigate('Groups');
+            }} />
           ),
         })}
       />
-      <Tab.Screen 
-        name="Leaderboard" 
-        component={LeaderboardScreen} 
+      <Tab.Screen
+        name="Leaderboard"
+        component={LeaderboardScreen}
         options={{
           tabBarLabel: 'Rankings',
-          tabBarIcon: ({ color, focused }) => (
-            <Ionicons 
-              name={focused ? 'trophy' : 'trophy-outline'} 
-              size={22} 
-              color={color} 
-            />
-          ),
+          tabBarIcon: ({ focused }) => <TabBarIcon name="trophy" focused={focused} />,
         }}
       />
-      <Tab.Screen 
-        name="Profile" 
-        component={ProfileScreen} 
+      <Tab.Screen
+        name="Profile"
+        component={ProfileScreen}
         options={{
           tabBarLabel: 'Profile',
-          tabBarIcon: ({ color, focused }) => (
-            <Ionicons 
-              name={focused ? 'person' : 'person-outline'} 
-              size={22} 
-              color={color} 
-            />
-          ),
+          tabBarIcon: ({ focused }) => <TabBarIcon name="user" focused={focused} />,
         }}
       />
     </Tab.Navigator>
@@ -142,30 +129,44 @@ export default function MainTabNavigator() {
 
 const styles = StyleSheet.create({
   tabBar: {
-    backgroundColor: COLORS.surfaceBase,
+    backgroundColor: COLORS.surfaceElevated,
     borderTopWidth: 1,
-    borderTopColor: COLORS.surfaceDark,
-    height: Platform.OS === 'ios' ? 88 : 68,
+    borderTopColor: COLORS.hairline,
+    height: Platform.OS === 'ios' ? 88 : 72,
     paddingTop: 8,
-    paddingBottom: Platform.OS === 'ios' ? 28 : 10,
-    ...SHADOWS.highElevation,
+    paddingBottom: Platform.OS === 'ios' ? 28 : 12,
+    ...SHADOWS.card,
+  },
+  tabBarItem: {
+    paddingTop: 4,
   },
   tabBarLabel: {
     fontFamily: 'Inter-Medium',
     fontSize: 11,
-    marginTop: 2,
+    marginTop: 4,
+    letterSpacing: 0.1,
   },
-  submitPillWrapper: {
-    top: -16,
-    justifyContent: 'center',
+  submitWrap: {
+    top: -18,
+    flex: 1,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   submitPill: {
     width: 60,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: COLORS.brandPrimary,
-    justifyContent: 'center',
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: COLORS.accent,
     alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: COLORS.accent,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.35,
+    shadowRadius: 16,
+    elevation: 10,
+  },
+  submitPillPressed: {
+    shadowOpacity: 0.15,
+    shadowOffset: { width: 0, height: 4 },
   },
 });
