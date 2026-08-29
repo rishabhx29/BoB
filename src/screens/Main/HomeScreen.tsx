@@ -1,66 +1,76 @@
-import React from 'react';
-import { View, FlatList, StyleSheet, SafeAreaView } from 'react-native';
-import { FeedCard, TodayActivity, TodayBanner } from '@/components/feed';
-import { COLORS, SIZES } from '@/constants/theme';
-import { Text } from '@/components/ui';
+import React, { useRef } from 'react';
+import { View, FlatList, StyleSheet, SafeAreaView, Pressable } from 'react-native';
+import Animated, { useSharedValue, useAnimatedStyle, withSpring, interpolate } from 'react-native-reanimated';
+import { FeedCard, TodayBanner, Text, Icon, Avatar } from '@/components/ui';
+import { COLORS, RADIUS } from '@/constants/theme';
+import { useAuthStore } from '@/store/useAuthStore';
+import { TodayActivity } from '@/components/feed/TodayBanner';
+import { IconName } from '@/components/ui/Icon';
 
-// Mock Data
-const MOCK_TODAY_ACTIVITIES: TodayActivity[] = [
-  { id: '1', name: 'Gym', icon: '🏋️', color: '#3b82f6', status: 'pending' },
-  { id: '2', name: 'Read', icon: '📚', color: '#10b981', status: 'submitted' },
-  { id: '3', name: 'Code', icon: '💻', color: '#8b5cf6', status: 'rest' },
+// Mock data — replaced when feed goes live
+const MOCK_TODAY: TodayActivity[] = [
+  { id: '1', name: 'Gym', icon: 'barbell', color: '#8B5CF6', status: 'pending' },
+  { id: '2', name: 'Read', icon: 'book', color: '#2E9D6A', status: 'submitted' },
+  { id: '3', name: 'Code', icon: 'code', color: '#FF5B1F', status: 'rest' },
+  { id: '4', name: 'Meditate', icon: 'leaf', color: '#0EA5E9', status: 'pending' },
 ];
 
 const MOCK_FEED = [
   {
     id: 'f1',
-    user: { name: 'Alex', avatarUrl: 'https://i.pravatar.cc/150?u=alex', groupName: 'Morning Hustle' },
-    activity: { name: 'Gym', icon: '🏋️', color: '#3b82f6' },
+    user: { id: 'u1', name: 'Alex Rivera', avatarUrl: 'https://i.pravatar.cc/200?u=alex', groupName: 'Morning Hustle' },
+    activity: { id: 'a1', name: 'Gym', icon: 'barbell' as IconName, color: '#8B5CF6' },
     submission: {
-      photoUrl: 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=1470&auto=format&fit=crop',
-      title: 'Leg day crushed! 🦵',
-      description: 'Squats felt heavy today but pushed through the final set.',
-      summaryText: 'Squats, Leg Press, Calves - 60 min',
-      timestamp: '2 hrs ago',
+      id: 's1',
+      photoUrl: 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=800&auto=format&fit=crop',
+      title: 'Leg day, crushed',
+      description: 'Squats felt heavy today, but pushed through the final set. New PR on the leg press.',
+      summaryText: 'Squats, leg press, calves · 60 min',
+      timestamp: '2h ago',
       streakCount: 14,
       reactions: 5,
       comments: 2,
-    }
+    },
   },
   {
     id: 'f2',
-    user: { name: 'Sarah', avatarUrl: 'https://i.pravatar.cc/150?u=sarah', groupName: 'Bookworms' },
-    activity: { name: 'Read', icon: '📚', color: '#10b981' },
+    user: { id: 'u2', name: 'Sarah Kim', avatarUrl: 'https://i.pravatar.cc/200?u=sarah', groupName: 'Bookworms' },
+    activity: { id: 'a2', name: 'Read', icon: 'book' as IconName, color: '#2E9D6A' },
     submission: {
-      title: 'Atomic Habits - Chap 4',
-      description: 'The cue, craving, response, reward loop is so real.',
-      summaryText: 'Atomic Habits - 30 mins',
-      timestamp: '4 hrs ago',
+      id: 's2',
+      title: 'Atomic Habits, ch. 4',
+      description: 'The cue, craving, response, reward loop is so real. The 2-minute rule changed how I start tasks.',
+      summaryText: 'Atomic Habits · 30 min',
+      timestamp: '4h ago',
       streakCount: 5,
       reactions: 3,
       comments: 0,
-    }
-  }
+    },
+  },
 ];
 
 export default function HomeScreen() {
-  const handleActivityPress = (act: TodayActivity) => {
+  const { user } = useAuthStore();
+
+  const handleActivityPress = (_act: TodayActivity) => {
     // Navigate to submission flow
-    console.log('Pressed', act.name);
   };
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <View style={styles.header}>
-        <Text variant="headingLg">Feed</Text>
-      </View>
       <FlatList
         data={MOCK_FEED}
         keyExtractor={(item) => item.id}
-        ListHeaderComponent={<TodayBanner activities={MOCK_TODAY_ACTIVITIES} onActivityPress={handleActivityPress} />}
+        ListHeaderComponent={
+          <GreetingHeader name={user?.displayName || 'You'} onActivityPress={handleActivityPress} />
+        }
         renderItem={({ item }) => (
           <View style={styles.cardWrapper}>
-            <FeedCard user={item.user} activity={item.activity} submission={item.submission} />
+            <FeedCard
+              user={item.user}
+              activity={item.activity}
+              submission={item.submission}
+            />
           </View>
         )}
         contentContainerStyle={styles.listContent}
@@ -70,20 +80,48 @@ export default function HomeScreen() {
   );
 }
 
+function GreetingHeader({ name, onActivityPress }: { name: string; onActivityPress: (act: TodayActivity) => void }) {
+  return (
+    <View style={styles.header}>
+      <View style={styles.greeting}>
+        <View style={styles.greetingText}>
+          <Text variant="eyebrow" color={COLORS.inkSecondary}>Today</Text>
+          <Text variant="displaySm" color={COLORS.inkDisplay} style={styles.greetingTitle}>
+            Hey, {name.split(' ')[0]}.
+          </Text>
+        </View>
+        <Avatar name={name} size="md" />
+      </View>
+
+      <TodayBanner activities={MOCK_TODAY} onActivityPress={onActivityPress} />
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: COLORS.surfaceBase,
   },
-  header: {
-    paddingHorizontal: SIZES.padding,
-    paddingTop: 16,
-    paddingBottom: 8,
-  },
   listContent: {
-    paddingBottom: 100, // Space for bottom tabs
+    paddingBottom: 120,
   },
   cardWrapper: {
-    paddingHorizontal: SIZES.padding,
-  }
+    paddingHorizontal: 16,
+  },
+  header: {
+    paddingHorizontal: 24,
+    paddingTop: 20,
+    paddingBottom: 8,
+  },
+  greeting: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 20,
+  },
+  greetingText: { flex: 1 },
+  greetingTitle: {
+    marginTop: 6,
+  },
 });

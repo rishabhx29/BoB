@@ -1,101 +1,95 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, StyleSheet, FlatList, RefreshControl, Alert, Animated, Pressable } from 'react-native';
-import { Text } from '@/components/ui/Text';
+import { View, StyleSheet, FlatList, RefreshControl, Alert, Pressable, Animated } from 'react-native';
+import AnimatedLib, {
+  useSharedValue,
+  useAnimatedStyle,
+  withRepeat,
+  withTiming,
+  Easing,
+} from 'react-native-reanimated';
+import { Text, Button, BottomSheet, Icon, IconName } from '@/components/ui';
 import { GroupCard } from '@/components/groups/GroupCard';
-import { COLORS, SIZES, SHADOWS } from '@/constants/theme';
+import { COLORS, RADIUS } from '@/constants/theme';
 import { useNavigation } from '@react-navigation/native';
-import { BottomSheet } from '@/components/ui/BottomSheet';
-import { Button } from '@/components/ui/Button';
+import { useAuthStore } from '@/store/useAuthStore';
+import { VoltPeek } from '@/components/brand/VoltMark';
+
+const MOCK_GROUPS = [
+  {
+    id: 'g1',
+    name: 'Morning Hustle',
+    icon: 'sun' as IconName,
+    iconColor: '#F59E0B',
+    activitiesCount: 3,
+    allSubmitted: false,
+    streakDays: 47,
+    members: [
+      { avatarUrl: 'https://i.pravatar.cc/100?u=alex', displayName: 'Alex' },
+      { avatarUrl: 'https://i.pravatar.cc/100?u=sarah', displayName: 'Sarah' },
+      { avatarUrl: 'https://i.pravatar.cc/100?u=mike', displayName: 'Mike' },
+      { avatarUrl: 'https://i.pravatar.cc/100?u=jessica', displayName: 'Jessica' },
+      { avatarUrl: null, displayName: 'You' },
+    ],
+  },
+  {
+    id: 'g2',
+    name: 'Bookworms',
+    icon: 'book' as IconName,
+    iconColor: '#2E9D6A',
+    activitiesCount: 1,
+    allSubmitted: true,
+    streakDays: 12,
+    members: [
+      { avatarUrl: 'https://i.pravatar.cc/100?u=sarah', displayName: 'Sarah' },
+      { avatarUrl: null, displayName: 'You' },
+    ],
+  },
+  {
+    id: 'g3',
+    name: 'Code & Lift',
+    icon: 'code' as IconName,
+    iconColor: '#FF5B1F',
+    activitiesCount: 2,
+    allSubmitted: false,
+    streakDays: 89,
+    members: [
+      { avatarUrl: 'https://i.pravatar.cc/100?u=mike', displayName: 'Mike' },
+      { avatarUrl: 'https://i.pravatar.cc/100?u=alex', displayName: 'Alex' },
+      { avatarUrl: 'https://i.pravatar.cc/100?u=jessica', displayName: 'Jessica' },
+    ],
+  },
+];
 
 export default function GroupsScreen() {
   const navigation = useNavigation<any>();
+  const { user } = useAuthStore();
   const [refreshing, setRefreshing] = useState(false);
-  const [actionSheetVisible, setActionSheetVisible] = useState(false);
+  const [groups, setGroups] = useState(MOCK_GROUPS);
+  const [actionSheet, setActionSheet] = useState(false);
 
-  // Mock data for Phase 3
-  const [groups, setGroups] = useState([
-    {
-      id: '1',
-      name: 'Morning Warriors',
-      emoji: '🌅',
-      avatars: [null, null, null, null, null],
-      activitiesCount: 3,
-      allSubmitted: false,
-    },
-    {
-      id: '2',
-      name: 'Book Worms',
-      emoji: '📚',
-      avatars: [null, null],
-      activitiesCount: 1,
-      allSubmitted: true,
-    }
-  ]);
-
-  const onRefresh = React.useCallback(() => {
+  const onRefresh = () => {
     setRefreshing(true);
-    setTimeout(() => {
-      setRefreshing(false);
-    }, 1000);
-  }, []);
-
-  const handleGroupPress = (groupId: string) => {
-    navigation.navigate('GroupHome', { groupId });
+    setTimeout(() => setRefreshing(false), 900);
   };
 
-  const handleGroupLongPress = (groupId: string, groupName: string) => {
+  const handleLongPress = (id: string, name: string) => {
     Alert.alert(
-      'Leave Group?',
-      `Are you sure you want to leave ${groupName}?`,
+      'Leave pact?',
+      `You'll lose your streak in ${name}. You can be re-invited.`,
       [
         { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Leave', 
-          style: 'destructive',
-          onPress: () => setGroups(prev => prev.filter(g => g.id !== groupId))
-        }
-      ]
+        { text: 'Leave', style: 'destructive', onPress: () => setGroups(g => g.filter(x => x.id !== id)) },
+      ],
     );
-  };
-
-  // Volt pulse animation
-  const voltScale = useRef(new Animated.Value(1)).current;
-  useEffect(() => {
-    if (groups.length === 0) {
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(voltScale, { toValue: 1.1, duration: 1000, useNativeDriver: true }),
-          Animated.timing(voltScale, { toValue: 1, duration: 1000, useNativeDriver: true }),
-        ])
-      ).start();
-    }
-  }, [groups.length]);
-
-  const renderEmptyComponent = () => (
-    <View style={styles.emptyContainer}>
-      <Animated.View style={[styles.voltPlaceholder, { transform: [{ scale: voltScale }] }]}>
-        <Text style={{ fontSize: 40 }}>⚡</Text>
-      </Animated.View>
-      <Text variant="headingMd" style={styles.emptyTitle}>No pacts yet</Text>
-      <Text variant="body" style={styles.emptySub}>
-        Create a new group or join an existing one to start building habits with friends.
-      </Text>
-    </View>
-  );
-
-  // Tactile FAB
-  const fabTranslateY = useRef(new Animated.Value(0)).current;
-  const handleFabPressIn = () => {
-    Animated.spring(fabTranslateY, { toValue: 4, useNativeDriver: true, speed: 50 }).start();
-  };
-  const handleFabPressOut = () => {
-    Animated.spring(fabTranslateY, { toValue: 0, useNativeDriver: true, speed: 50 }).start();
   };
 
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text variant="headingLg">Your Pacts</Text>
+        <Text variant="eyebrow" color={COLORS.inkSecondary}>Your pacts</Text>
+        <Text variant="displaySm" color={COLORS.inkDisplay} style={styles.headerTitle}>
+          {groups.length} {groups.length === 1 ? 'pact' : 'pacts'}
+        </Text>
       </View>
 
       <FlatList
@@ -103,129 +97,144 @@ export default function GroupsScreen() {
         keyExtractor={item => item.id}
         contentContainerStyle={styles.listContent}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.brandPrimary} />
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={COLORS.accent}
+          />
         }
-        ListEmptyComponent={renderEmptyComponent}
+        ListEmptyComponent={<EmptyState />}
         renderItem={({ item }) => (
           <GroupCard
+            id={item.id}
             name={item.name}
-            emoji={item.emoji}
-            avatars={item.avatars}
+            icon={item.icon}
+            iconColor={item.iconColor}
+            members={item.members}
             activitiesCount={item.activitiesCount}
             allSubmitted={item.allSubmitted}
-            onPress={() => handleGroupPress(item.id)}
-            onLongPress={() => handleGroupLongPress(item.id, item.name)}
+            streakDays={item.streakDays}
+            onPress={() => navigation.navigate('GroupHome', { groupId: item.id })}
+            onLongPress={() => handleLongPress(item.id, item.name)}
           />
         )}
       />
 
-      <Animated.View style={[styles.fabContainer, { transform: [{ translateY: fabTranslateY }] }]}>
-        <Pressable 
-          style={({ pressed }) => [styles.fab, pressed ? SHADOWS.fabPressed : SHADOWS.fabDefault]}
-          onPressIn={handleFabPressIn}
-          onPressOut={handleFabPressOut}
-          onPress={() => setActionSheetVisible(true)}
+      <View style={styles.fabWrap}>
+        <Pressable
+          onPress={() => setActionSheet(true)}
+          style={({ pressed }) => [styles.fab, pressed ? styles.fabPressed : null]}
+          accessibilityRole="button"
+          accessibilityLabel="Add pact"
         >
-          <Text style={styles.fabIcon}>+</Text>
+          <Icon name="plus" size={26} color="#FFFFFF" />
         </Pressable>
-      </Animated.View>
+      </View>
 
-      <BottomSheet 
-        isVisible={actionSheetVisible}
-        onClose={() => setActionSheetVisible(false)}
-      >
-        <Text variant="headingMd" style={styles.sheetTitle}>Add Group</Text>
-        <View style={styles.sheetActions}>
-          <Button 
-            label="✨ Create a new Pact" 
-            variant="primary" 
-            isPill
-            onPress={() => {
-              setActionSheetVisible(false);
-              navigation.navigate('CreateGroup');
-            }}
-          />
-          <View style={{ height: 16 }} />
-          <Button 
-            label="🤝 Join with invite code" 
-            variant="secondary" 
-            isPill
-            onPress={() => {
-              setActionSheetVisible(false);
-              navigation.navigate('JoinGroup');
-            }}
-          />
-        </View>
+      <BottomSheet isVisible={actionSheet} onClose={() => setActionSheet(false)}>
+        <Text variant="headingMd" color={COLORS.inkDisplay} style={styles.sheetTitle}>
+          Add a pact
+        </Text>
+        <Text variant="body" color={COLORS.inkSecondary} style={styles.sheetSub}>
+          Start a new one, or join with a code from a friend.
+        </Text>
+
+        <View style={{ height: 24 }} />
+        <Button
+          label="Start a new pact"
+          fullWidth
+          size="lg"
+          trailingIcon="arrow-right"
+          onPress={() => {
+            setActionSheet(false);
+            navigation.navigate('CreateGroup');
+          }}
+        />
+        <View style={{ height: 10 }} />
+        <Button
+          label="Join with code"
+          fullWidth
+          size="lg"
+          variant="secondary"
+          leadingIcon="key"
+          onPress={() => {
+            setActionSheet(false);
+            navigation.navigate('JoinGroup');
+          }}
+        />
       </BottomSheet>
     </View>
   );
 }
 
+function EmptyState() {
+  const breathe = useSharedValue(1);
+  useEffect(() => {
+    breathe.value = withRepeat(
+      withTiming(1.06, { duration: 1400, easing: Easing.inOut(Easing.cubic) }),
+      -1,
+      true
+    );
+  }, []);
+  const animStyle = useAnimatedStyle(() => ({ transform: [{ scale: breathe.value }] }));
+
+  return (
+    <View style={styles.empty}>
+      <AnimatedLib.View style={animStyle}>
+        <VoltPeek size={100} />
+      </AnimatedLib.View>
+      <Text variant="headingLg" color={COLORS.inkDisplay} style={styles.emptyTitle}>
+        No pacts yet
+      </Text>
+      <Text variant="body" color={COLORS.inkSecondary} style={styles.emptySub}>
+        Create a pact or join one with an invite code. Show up together.
+      </Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
-  container: { 
-    flex: 1, 
-    backgroundColor: COLORS.surfaceBase,
-  },
+  container: { flex: 1, backgroundColor: COLORS.surfaceBase },
   header: {
-    paddingHorizontal: SIZES.padding,
-    paddingTop: 60,
-    paddingBottom: 20,
-    backgroundColor: COLORS.surfaceBase,
+    paddingHorizontal: 24,
+    paddingTop: 20,
+    paddingBottom: 12,
   },
+  headerTitle: { marginTop: 4 },
   listContent: {
-    padding: SIZES.padding,
-    paddingBottom: 120, // Space for FAB
-    flexGrow: 1,
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 140,
   },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: 60,
-  },
-  voltPlaceholder: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: COLORS.surfaceDark,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 24,
-    ...SHADOWS.mediumElevation,
-  },
-  emptyTitle: {
-    marginBottom: 8,
-  },
-  emptySub: {
-    textAlign: 'center',
-    maxWidth: '80%',
-    color: COLORS.textSecondary,
-    lineHeight: 24,
-  },
-  fabContainer: {
+  fabWrap: {
     position: 'absolute',
-    bottom: 32,
+    bottom: 24,
     right: 24,
   },
   fab: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: COLORS.brandPrimary,
-    justifyContent: 'center',
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: COLORS.accent,
     alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: COLORS.accent,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.35,
+    shadowRadius: 16,
+    elevation: 8,
   },
-  fabIcon: {
-    color: '#fff',
-    fontSize: 32,
-    fontWeight: 'bold',
-    marginTop: -2,
+  fabPressed: {
+    transform: [{ scale: 0.96 }],
+    shadowOpacity: 0.15,
   },
-  sheetTitle: {
-    marginBottom: 24,
-    textAlign: 'center',
+  sheetTitle: { textAlign: 'center' },
+  sheetSub: { textAlign: 'center', marginTop: 6, lineHeight: 22 },
+  empty: {
+    alignItems: 'center',
+    paddingTop: 80,
+    paddingHorizontal: 40,
   },
-  sheetActions: {
-    paddingBottom: 16,
-  }
+  emptyTitle: { marginTop: 24, marginBottom: 8, textAlign: 'center' },
+  emptySub: { textAlign: 'center', lineHeight: 22, maxWidth: 280 },
 });

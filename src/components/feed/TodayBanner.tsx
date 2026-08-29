@@ -1,14 +1,17 @@
 import React from 'react';
-import { View, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
-import { Text } from '@/components/ui';
-import { COLORS, SIZES } from '@/constants/theme';
+import { View, ScrollView, StyleSheet, Pressable } from 'react-native';
+import { Text } from '../ui/Text';
+import { Icon, IconName } from '../ui/Icon';
+import { COLORS, RADIUS, SHADOWS } from '@/constants/theme';
+
+export type TodayStatus = 'pending' | 'submitted' | 'rest' | 'missed';
 
 export interface TodayActivity {
   id: string;
   name: string;
-  icon: string;
+  icon: IconName;
   color: string;
-  status: 'pending' | 'submitted' | 'rest';
+  status: TodayStatus;
 }
 
 interface TodayBannerProps {
@@ -16,74 +19,123 @@ interface TodayBannerProps {
   onActivityPress: (activity: TodayActivity) => void;
 }
 
+/**
+ * Horizontal scroll of today's pact activities.
+ * - Pill shape with activity color tint
+ * - Small status dot (color only — paired with label for a11y)
+ * - Tap = direct submission
+ */
 export function TodayBanner({ activities, onActivityPress }: TodayBannerProps) {
   return (
     <View style={styles.container}>
-      <Text variant="headingMd" style={styles.title}>Today</Text>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-        {activities.map((act) => (
-          <TouchableOpacity
+      <View style={styles.titleRow}>
+        <Text variant="eyebrow" color={COLORS.inkSecondary}>Today</Text>
+        <Text variant="caption" color={COLORS.inkTertiary}>
+          {activities.filter(a => a.status === 'submitted').length}/{activities.length} done
+        </Text>
+      </View>
+
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+      >
+        {activities.map(act => (
+          <Pressable
             key={act.id}
-            style={styles.pill}
             onPress={() => onActivityPress(act)}
-            activeOpacity={0.7}
+            style={({ pressed }) => [
+              styles.pill,
+              { opacity: pressed ? 0.7 : 1 },
+            ]}
+            accessibilityRole="button"
+            accessibilityLabel={`${act.name}, ${act.status === 'submitted' ? 'submitted' : act.status === 'pending' ? 'pending' : 'rest day'}`}
           >
-            <View style={[styles.iconWrapper, { backgroundColor: act.color }]}>
-              <Text variant="body" style={{ color: '#fff' }}>{act.icon}</Text>
+            <View style={[styles.iconWrap, { backgroundColor: hexToTint(act.color) }]}>
+              <Icon name={act.icon} size={20} color={act.color} />
             </View>
-            <Text variant="caption" style={styles.actName}>{act.name}</Text>
-            
-            {/* Status dot */}
-            {act.status === 'pending' && <View style={[styles.statusDot, { backgroundColor: COLORS.brandPrimary }]} />}
-            {act.status === 'submitted' && <View style={[styles.statusDot, { backgroundColor: COLORS.success }]} />}
-            {act.status === 'rest' && <View style={[styles.statusDot, { backgroundColor: COLORS.textSecondary }]} />}
-          </TouchableOpacity>
+            <View style={styles.pillText}>
+              <Text variant="label" color={COLORS.inkDisplay} numberOfLines={1}>{act.name}</Text>
+              <Text variant="caption" color={statusColor(act.status)}>
+                {statusLabel(act.status)}
+              </Text>
+            </View>
+            <View style={[styles.statusDot, { backgroundColor: statusColor(act.status) }]} />
+          </Pressable>
         ))}
       </ScrollView>
     </View>
   );
 }
 
+function statusColor(s: TodayStatus) {
+  switch (s) {
+    case 'submitted': return COLORS.positive;
+    case 'pending':   return COLORS.accent;
+    case 'missed':    return COLORS.danger;
+    case 'rest':      return COLORS.inkTertiary;
+  }
+}
+
+function statusLabel(s: TodayStatus) {
+  switch (s) {
+    case 'submitted': return 'Done';
+    case 'pending':   return 'Pending';
+    case 'missed':    return 'Missed';
+    case 'rest':      return 'Rest';
+  }
+}
+
+function hexToTint(hex: string, alpha: number = 0.14) {
+  const h = hex.replace('#', '');
+  const r = parseInt(h.substring(0, 2), 16);
+  const g = parseInt(h.substring(2, 4), 16);
+  const b = parseInt(h.substring(4, 6), 16);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
 const styles = StyleSheet.create({
   container: {
     marginBottom: 24,
   },
-  title: {
+  titleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 24,
     marginBottom: 12,
-    paddingHorizontal: SIZES.padding,
   },
   scrollContent: {
-    paddingHorizontal: SIZES.padding,
-    gap: 12,
+    paddingHorizontal: 24,
+    gap: 10,
   },
   pill: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.surfaceBase,
-    padding: 8,
-    paddingRight: 16,
-    borderRadius: SIZES.radiusPill,
-    elevation: 2,
-    shadowColor: COLORS.shadowDark,
-    shadowOffset: { width: 2, height: 2 },
-    shadowOpacity: 1,
-    shadowRadius: 4,
+    backgroundColor: COLORS.surfaceElevated,
+    paddingLeft: 8,
+    paddingRight: 14,
+    paddingVertical: 8,
+    borderRadius: RADIUS.pill,
+    borderWidth: 1,
+    borderColor: COLORS.hairline,
+    gap: 10,
   },
-  iconWrapper: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    justifyContent: 'center',
+  iconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     alignItems: 'center',
-    marginRight: 8,
+    justifyContent: 'center',
   },
-  actName: {
-    fontWeight: 'bold',
+  pillText: {
+    justifyContent: 'center',
   },
   statusDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
-    marginLeft: 8,
   },
 });
+
+export default TodayBanner;

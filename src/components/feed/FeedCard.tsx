@@ -1,164 +1,210 @@
 import React from 'react';
-import { View, StyleSheet, Image, TouchableOpacity } from 'react-native';
-import { Card, Text, Avatar, Badge } from '@/components/ui';
-import { COLORS, SIZES, TYPOGRAPHY } from '@/constants/theme';
+import { View, StyleSheet, Image, Pressable } from 'react-native';
+import { Card } from '../ui/Card';
+import { Text } from '../ui/Text';
+import { Avatar } from '../ui/Avatar';
+import { Badge } from '../ui/Badge';
+import { Icon, IconName } from '../ui/Icon';
+import { COLORS, RADIUS, SHADOWS, SPACE } from '@/constants/theme';
 
-export interface FeedCardProps {
-  user: { name: string; avatarUrl: string; groupName: string };
-  activity: { name: string; icon: string; color: string };
-  submission: {
-    photoUrl?: string;
-    title: string;
-    description: string;
-    summaryText: string;
-    timestamp: string;
-    streakCount: number;
-    reactions: number;
-    comments: number;
-  };
+export interface FeedCardSubmission {
+  id: string;
+  photoUrl?: string;
+  title?: string;
+  description?: string;
+  summaryText?: string;
+  timestamp: string;
+  streakCount: number;
+  reactions: number;
+  comments: number;
 }
 
-export function FeedCard({ user, activity, submission }: FeedCardProps) {
+export interface FeedCardProps {
+  user: { id?: string; name: string; avatarUrl?: string | null; groupName: string };
+  activity: { id?: string; name: string; icon: IconName; color: string };
+  submission: FeedCardSubmission;
+  onReact?: () => void;
+  onComment?: () => void;
+  onPress?: () => void;
+}
+
+/**
+ * Editorial card layout: photo is the hero, content stacks beneath.
+ * No side-stripe border (forbidden in the design system).
+ * Reaction count uses phosphor icons, not emoji.
+ */
+export function FeedCard({ user, activity, submission, onReact, onComment, onPress }: FeedCardProps) {
   return (
-    <Card elevation="medium" padding={SIZES.padding} style={styles.cardContainer}>
+    <Card variant="elevated" padding="none" onPress={onPress} style={styles.card}>
+      {/* Activity color bar — thin, top-anchored, full-width */}
+      <View style={[styles.activityBar, { backgroundColor: activity.color }]} />
+
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.userInfo}>
-          <Avatar src={user.avatarUrl} size="md" />
+          <Avatar src={user.avatarUrl} name={user.name} size="md" />
           <View style={styles.userText}>
-            <Text variant="headingMd">{user.name}</Text>
-            <View style={styles.groupTag}>
-              <Text variant="caption">{user.groupName}</Text>
-            </View>
+            <Text variant="headingSm" color={COLORS.inkDisplay} numberOfLines={1}>
+              {user.name}
+            </Text>
+            <Text variant="caption" color={COLORS.inkSecondary} numberOfLines={1}>
+              {user.groupName} · {submission.timestamp}
+            </Text>
           </View>
         </View>
-        <Text variant="caption">{submission.timestamp}</Text>
-      </View>
-
-      {/* Activity Title */}
-      <View style={styles.activityHeader}>
-        <View style={[styles.activityIconWrapper, { backgroundColor: activity.color }]}>
-          <Text variant="body" style={{ color: '#fff' }}>{activity.icon}</Text>
+        <View style={[styles.activityPill, { backgroundColor: hexToTint(activity.color) }]}>
+          <Icon name={activity.icon} size={14} color={activity.color} />
+          <Text variant="label" style={{ color: activity.color, fontSize: 12 }}>
+            {activity.name}
+          </Text>
         </View>
-        <Text variant="headingMd">{activity.name}</Text>
-        <Badge text={`🔥 Day ${submission.streakCount}`} variant="success" style={styles.streakBadge} />
       </View>
 
-      {/* Photo */}
+      {/* Photo hero */}
       {submission.photoUrl && (
-        <Image source={{ uri: submission.photoUrl }} style={styles.photo} resizeMode="cover" />
+        <View style={styles.photoWrap}>
+          <Image source={{ uri: submission.photoUrl }} style={styles.photo} resizeMode="cover" />
+          {submission.streakCount > 0 && (
+            <View style={styles.streakChip}>
+              <Icon name="flame" size={14} color="#FFFFFF" />
+              <Text variant="label" color="#FFFFFF" style={styles.streakText}>
+                Day {submission.streakCount}
+              </Text>
+            </View>
+          )}
+        </View>
       )}
 
       {/* Content */}
-      <View style={styles.content}>
-        <Text variant="headingMd" style={styles.title}>{submission.title}</Text>
-        <Text variant="body" style={styles.description} numberOfLines={3}>
-          {submission.description}
-        </Text>
-        <View style={styles.summaryBox}>
-          <Text variant="caption">{submission.summaryText}</Text>
+      {(submission.title || submission.description) && (
+        <View style={styles.content}>
+          {submission.title && (
+            <Text variant="headingMd" color={COLORS.inkDisplay} numberOfLines={2}>
+              {submission.title}
+            </Text>
+          )}
+          {submission.description && (
+            <Text
+              variant="bodySm"
+              color={COLORS.inkSecondary}
+              numberOfLines={3}
+              style={styles.description}
+            >
+              {submission.description}
+            </Text>
+          )}
         </View>
-      </View>
+      )}
 
-      {/* Footer / Reactions */}
+      {/* Footer */}
       <View style={styles.footer}>
-        <TouchableOpacity style={styles.reactionButton}>
-          <Text variant="body">🔥</Text>
-          <Text variant="caption" style={styles.reactionCount}>{submission.reactions}</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.reactionButton}>
-          <Text variant="body">💬</Text>
-          <Text variant="caption" style={styles.reactionCount}>{submission.comments}</Text>
-        </TouchableOpacity>
+        <Pressable onPress={onReact} style={styles.footerAction} hitSlop={6}>
+          <Icon name="fire" size={18} color={COLORS.inkPrimary} />
+          <Text variant="label" color={COLORS.inkPrimary}>{submission.reactions}</Text>
+        </Pressable>
+        <Pressable onPress={onComment} style={styles.footerAction} hitSlop={6}>
+          <Icon name="chat-circle" size={18} color={COLORS.inkPrimary} />
+          <Text variant="label" color={COLORS.inkPrimary}>{submission.comments}</Text>
+        </Pressable>
+        <View style={{ flex: 1 }} />
+        <Pressable onPress={onPress} hitSlop={6} style={styles.footerAction}>
+          <Icon name="arrow-up-right" size={18} color={COLORS.inkSecondary} />
+        </Pressable>
       </View>
     </Card>
   );
 }
 
+function hexToTint(hex: string, alpha: number = 0.12) {
+  const h = hex.replace('#', '');
+  const r = parseInt(h.substring(0, 2), 16);
+  const g = parseInt(h.substring(2, 4), 16);
+  const b = parseInt(h.substring(4, 6), 16);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
 const styles = StyleSheet.create({
-  cardContainer: {
-    marginBottom: SIZES.padding,
+  card: {
+    marginBottom: 16,
+    overflow: 'hidden',
+  },
+  activityBar: {
+    height: 3,
+    width: '100%',
   },
   header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    justifyContent: 'space-between',
+    padding: 16,
+    paddingBottom: 12,
+    gap: 12,
   },
   userInfo: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    flex: 1,
+    gap: 10,
   },
   userText: {
-    justifyContent: 'center',
+    flex: 1,
   },
-  groupTag: {
-    backgroundColor: COLORS.surfaceDark,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: SIZES.radiusPill,
-    marginTop: 4,
-    alignSelf: 'flex-start',
-  },
-  activityHeader: {
+  activityPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    marginBottom: 16,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: RADIUS.pill,
+    gap: 5,
   },
-  activityIconWrapper: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  streakBadge: {
-    marginLeft: 'auto',
+  photoWrap: {
+    position: 'relative',
   },
   photo: {
     width: '100%',
-    height: 300,
-    borderRadius: SIZES.radiusButton,
-    marginBottom: 16,
-    backgroundColor: COLORS.surfaceDark,
+    aspectRatio: 4 / 5,
+    backgroundColor: COLORS.surfaceSunken,
+  },
+  streakChip: {
+    position: 'absolute',
+    top: 12,
+    left: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(14, 14, 16, 0.7)',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: RADIUS.pill,
+    gap: 4,
+  },
+  streakText: {
+    fontFamily: 'JetBrainsMono-Bold',
+    fontSize: 12,
   },
   content: {
-    marginBottom: 16,
-  },
-  title: {
-    marginBottom: 8,
+    paddingHorizontal: 16,
+    paddingTop: 14,
+    paddingBottom: 4,
+    gap: 6,
   },
   description: {
-    color: COLORS.textSecondary,
-    marginBottom: 12,
-  },
-  summaryBox: {
-    backgroundColor: 'rgba(255, 255, 255, 0.5)',
-    padding: 12,
-    borderRadius: SIZES.radiusButton,
-    borderLeftWidth: 3,
-    borderLeftColor: COLORS.brandPrimary,
+    lineHeight: 20,
   },
   footer: {
     flexDirection: 'row',
-    gap: 16,
+    alignItems: 'center',
+    padding: 14,
+    paddingHorizontal: 16,
     borderTopWidth: 1,
-    borderTopColor: COLORS.surfaceDark,
-    paddingTop: 16,
+    borderTopColor: COLORS.hairline,
+    gap: 16,
   },
-  reactionButton: {
+  footerAction: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.surfaceBase,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: SIZES.radiusPill,
-    ...TYPOGRAPHY.caption,
-  },
-  reactionCount: {
-    marginLeft: 6,
-    fontWeight: 'bold',
+    gap: 6,
+    paddingVertical: 4,
   },
 });
+
+export default FeedCard;

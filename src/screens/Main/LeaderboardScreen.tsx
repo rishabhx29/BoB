@@ -1,128 +1,140 @@
 import React from 'react';
 import { View, FlatList, StyleSheet, SafeAreaView } from 'react-native';
-import { Text, Avatar, Card } from '@/components/ui';
-import { COLORS, SIZES, TYPOGRAPHY } from '@/constants/theme';
+import { Text, Avatar, Card, Badge, Icon, IconName } from '@/components/ui';
+import { COLORS, RADIUS } from '@/constants/theme';
+import { useAuthStore } from '@/store/useAuthStore';
 
-// Mock Leaderboard Data
 const MOCK_LEADERBOARD = [
-  { id: '1', rank: 1, name: 'Alex', avatarUrl: 'https://i.pravatar.cc/150?u=alex', xp: 4250, level: 4 },
-  { id: '2', rank: 2, name: 'You', avatarUrl: 'https://i.pravatar.cc/150?u=you', xp: 3800, level: 4 },
-  { id: '3', rank: 3, name: 'Sarah', avatarUrl: 'https://i.pravatar.cc/150?u=sarah', xp: 2900, level: 3 },
-  { id: '4', rank: 4, name: 'Mike', avatarUrl: 'https://i.pravatar.cc/150?u=mike', xp: 1200, level: 2 },
-  { id: '5', rank: 5, name: 'Jessica', avatarUrl: 'https://i.pravatar.cc/150?u=jessica', xp: 850, level: 2 },
+  { id: '1', rank: 1, name: 'Alex Rivera', avatarUrl: 'https://i.pravatar.cc/200?u=alex', xp: 4250, level: 4, you: false },
+  { id: '2', rank: 2, name: 'You', avatarUrl: null, xp: 3800, level: 4, you: true },
+  { id: '3', rank: 3, name: 'Sarah Kim', avatarUrl: 'https://i.pravatar.cc/200?u=sarah', xp: 2900, level: 3, you: false },
+  { id: '4', rank: 4, name: 'Mike Chen', avatarUrl: 'https://i.pravatar.cc/200?u=mike', xp: 1200, level: 2, you: false },
+  { id: '5', rank: 5, name: 'Jessica Lee', avatarUrl: 'https://i.pravatar.cc/200?u=jessica', xp: 850, level: 2, you: false },
+  { id: '6', rank: 6, name: 'Sam Patel', avatarUrl: null, xp: 420, level: 1, you: false },
 ];
 
 const MAX_XP = MOCK_LEADERBOARD[0].xp;
+const RANK_COLORS: Record<number, string> = {
+  1: '#FBBF24',
+  2: '#9CA3AF',
+  3: '#B45309',
+};
 
 export default function LeaderboardScreen() {
-  const renderItem = ({ item }: { item: typeof MOCK_LEADERBOARD[0] }) => {
-    const isTop3 = item.rank <= 3;
-    const isYou = item.name === 'You';
-    const fillPercentage = (item.xp / MAX_XP) * 100;
-
-    let rankColor = COLORS.textSecondary;
-    if (item.rank === 1) rankColor = '#FBBF24'; // Gold
-    else if (item.rank === 2) rankColor = '#9CA3AF'; // Silver
-    else if (item.rank === 3) rankColor = '#B45309'; // Bronze
-
-    return (
-      <Card 
-        elevation={isYou ? 'medium' : 'soft'} 
-        padding={16} 
-        style={[styles.card, isYou && styles.yourCard]}
-      >
-        <View style={styles.cardHeader}>
-          <Text variant="headingMd" style={[styles.rank, { color: rankColor }]}>
-            #{item.rank}
-          </Text>
-          <Avatar src={item.avatarUrl} size="md" />
-          <View style={styles.userInfo}>
-            <Text variant="headingMd">{item.name}</Text>
-            <Text variant="caption">Level {item.level}</Text>
-          </View>
-          <View style={styles.xpBox}>
-            <Text style={styles.xpText}>{item.xp} XP</Text>
-          </View>
-        </View>
-
-        <View style={styles.barBackground}>
-          <View style={[styles.barFill, { width: `${fillPercentage}%`, backgroundColor: isYou ? COLORS.brandPrimary : COLORS.success }]} />
-        </View>
-      </Card>
-    );
-  };
-
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.header}>
-        <Text variant="headingLg">Leaderboard</Text>
-        <Text variant="body" color={COLORS.textSecondary}>This Month's Champions</Text>
+        <Text variant="eyebrow" color={COLORS.inkSecondary}>This month</Text>
+        <Text variant="displaySm" color={COLORS.inkDisplay} style={styles.title}>
+          Leaderboard
+        </Text>
+        <Text variant="body" color={COLORS.inkSecondary} style={styles.subtitle}>
+          Who's showing up. Top 3 take the podium.
+        </Text>
       </View>
+
       <FlatList
         data={MOCK_LEADERBOARD}
-        keyExtractor={(item) => item.id}
-        renderItem={renderItem}
+        keyExtractor={i => i.id}
         contentContainerStyle={styles.listContent}
-        showsVerticalScrollIndicator={false}
+        renderItem={({ item }) => <Row item={item} maxXp={MAX_XP} />}
+        ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
       />
     </SafeAreaView>
   );
 }
 
+function Row({ item, maxXp }: { item: typeof MOCK_LEADERBOARD[number]; maxXp: number }) {
+  const fill = (item.xp / maxXp) * 100;
+  const rankColor = RANK_COLORS[item.rank] ?? COLORS.inkTertiary;
+
+  return (
+    <Card variant={item.you ? 'elevated' : 'flat'} padding="lg" style={item.you ? styles.you : null}>
+      <View style={styles.row}>
+        <View style={[styles.rankBox, { backgroundColor: hexToTint(rankColor, 0.14) }]}>
+          {item.rank <= 3 ? (
+            <Icon name="crown" size={20} color={rankColor} bold />
+          ) : (
+            <Text variant="numericMd" color={COLORS.inkDisplay}>{item.rank}</Text>
+          )}
+        </View>
+        <Avatar src={item.avatarUrl} name={item.name} size="md" />
+        <View style={styles.userInfo}>
+          <Text variant="headingSm" color={COLORS.inkDisplay} numberOfLines={1}>
+            {item.name}
+          </Text>
+          <Text variant="caption" color={COLORS.inkSecondary}>
+            Level {item.level}
+          </Text>
+        </View>
+        <View style={styles.xpBox}>
+          <Text variant="numericMd" color={COLORS.inkDisplay}>{item.xp.toLocaleString()}</Text>
+          <Text variant="caption" color={COLORS.inkTertiary}>XP</Text>
+        </View>
+      </View>
+
+      <View style={styles.barBg}>
+        <View
+          style={[
+            styles.barFill,
+            {
+              width: `${fill}%`,
+              backgroundColor: item.you ? COLORS.accent : COLORS.positive,
+            },
+          ]}
+        />
+      </View>
+    </Card>
+  );
+}
+
+function hexToTint(hex: string, alpha: number) {
+  const h = hex.replace('#', '');
+  const r = parseInt(h.substring(0, 2), 16);
+  const g = parseInt(h.substring(2, 4), 16);
+  const b = parseInt(h.substring(4, 6), 16);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: COLORS.surfaceBase,
-  },
-  header: {
-    paddingHorizontal: SIZES.padding,
-    paddingTop: 16,
-    paddingBottom: 24,
-  },
+  safeArea: { flex: 1, backgroundColor: COLORS.surfaceBase },
+  header: { paddingHorizontal: 24, paddingTop: 20, paddingBottom: 16 },
+  title: { marginTop: 4 },
+  subtitle: { marginTop: 6, lineHeight: 22 },
   listContent: {
-    paddingHorizontal: SIZES.padding,
-    paddingBottom: 100, // Space for bottom tabs
-    gap: 12,
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 120,
   },
-  card: {
-    marginBottom: 0,
-  },
-  yourCard: {
-    borderWidth: 2,
-    borderColor: COLORS.brandPrimary,
-  },
-  cardHeader: {
+  row: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
     marginBottom: 12,
   },
-  rank: {
-    width: 32,
-    textAlign: 'center',
+  rankBox: {
+    width: 40,
+    height: 40,
+    borderRadius: RADIUS.md,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  userInfo: {
-    flex: 1,
-  },
+  userInfo: { flex: 1 },
   xpBox: {
-    backgroundColor: COLORS.surfaceDark,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: SIZES.radiusPill,
+    alignItems: 'flex-end',
   },
-  xpText: {
-    ...TYPOGRAPHY.digitalDisplay,
-    fontSize: 16,
-  },
-  barBackground: {
-    height: 8,
-    backgroundColor: COLORS.surfaceDark,
-    borderRadius: 4,
-    width: '100%',
+  barBg: {
+    height: 6,
+    backgroundColor: COLORS.surfaceSunken,
+    borderRadius: 3,
     overflow: 'hidden',
   },
   barFill: {
     height: '100%',
-    borderRadius: 4,
-  }
+    borderRadius: 3,
+  },
+  you: {
+    borderWidth: 1.5,
+    borderColor: COLORS.accent,
+  },
 });
