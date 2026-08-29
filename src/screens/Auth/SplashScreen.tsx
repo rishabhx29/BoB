@@ -5,7 +5,6 @@ import { COLORS, SHADOWS, SIZES } from '../../../constants/theme';
 import { storage } from '@/utils/storage';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuthStore } from '@/store/useAuthStore';
-import { supabase } from '@/services/supabase'; // Assuming supabase is here, or we just handle JWT for now
 
 const { width, height } = Dimensions.get('window');
 

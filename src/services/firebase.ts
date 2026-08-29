@@ -10,6 +10,7 @@ import {
   limit,
   QueryConstraint,
 } from 'firebase/firestore';
+import { Platform } from 'react-native';
 import ENV from './env';
 
 /**
@@ -35,7 +36,25 @@ const firebaseApp = getApps().length === 0
   ? initializeApp(firebaseConfig)
   : getApp();
 
-export const firebaseAuth = getAuth(firebaseApp);
+// On native, use initializeAuth with AsyncStorage persistence.
+// On web, use standard getAuth which uses localStorage automatically.
+function createFirebaseAuth() {
+  if (Platform.OS !== 'web' && getApps().length === 1) {
+    try {
+      const { initializeAuth, getReactNativePersistence } = require('firebase/auth/react-native');
+      const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+      return initializeAuth(firebaseApp, {
+        persistence: getReactNativePersistence(AsyncStorage),
+      });
+    } catch {
+      // Fallback if the RN-specific module isn't available
+      return getAuth(firebaseApp);
+    }
+  }
+  return getAuth(firebaseApp);
+}
+
+export const firebaseAuth = createFirebaseAuth();
 export const firestore = getFirestore(firebaseApp);
 
 // ─── Firestore Collection Paths ────────────────────────────────────────────────

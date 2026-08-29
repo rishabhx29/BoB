@@ -6,10 +6,11 @@ import { COLORS } from '@/constants/theme';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
+import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { firebaseAuth } from '@/services/firebase';
 import { useAuthStore } from '@/store/useAuthStore';
 import { storage } from '@/utils/storage';
+import * as SecureStore from 'expo-secure-store';
 
 const registerSchema = z.object({
   email: z.string().email('Invalid email address'),
@@ -25,7 +26,6 @@ type RegisterForm = z.infer<typeof registerSchema>;
 export default function RegisterScreen({ navigation }: any) {
   const [authError, setAuthError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const { setUser } = useAuthStore();
 
   const {
     control,
@@ -63,10 +63,10 @@ export default function RegisterScreen({ navigation }: any) {
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       });
+      await SecureStore.setItemAsync('streakpact_jwt', token);
 
       // We should ideally navigate to an Avatar/Username setup screen next.
-      // But for Phase 2 basic auth, we can just go to Main.
-      navigation.reset({ index: 0, routes: [{ name: 'Main' }] });
+      navigation.replace('SetupProfile');
     } catch (error: any) {
       if (error.code === 'auth/email-already-in-use') {
         setAuthError('An account with this email already exists.');

@@ -4,8 +4,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text } from '@/components/ui';
 import { COLORS, SHADOWS } from '@/constants/theme';
 import * as Linking from 'expo-linking';
+import { useAuthStore } from '@/store/useAuthStore';
+import { firebaseAuth } from '@/services/firebase';
 
 export default function JoinOrCreateScreen({ navigation }: any) {
+  const { setUser } = useAuthStore();
   const slideAnim1 = useRef(new Animated.Value(50)).current;
   const slideAnim2 = useRef(new Animated.Value(50)).current;
   const fadeAnim1 = useRef(new Animated.Value(0)).current;
@@ -38,23 +41,41 @@ export default function JoinOrCreateScreen({ navigation }: any) {
     };
   }, []);
 
+  const completeAuth = () => {
+    const user = firebaseAuth.currentUser;
+    setUser({
+      id: user?.uid || 'new-user',
+      email: user?.email || '',
+      displayName: user?.displayName || 'New User',
+      username: 'NewUser',
+      avatarUrl: user?.photoURL || null,
+      level: 1,
+      xp: 0,
+      shieldsAvailable: 3,
+      totalSubmissions: 0,
+      longestStreak: 0,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+  };
+
   const handleDeepLink = (event: { url: string }) => {
     let data = Linking.parse(event.url);
     if (data.path === 'invite' && data.queryParams?.code) {
       // TODO: Handle invite code logic directly
       // navigate to Join with code
-      navigation.replace('Main'); // Fallback for now
+      completeAuth(); // Fallback for now
     }
   };
 
   const handleJoin = () => {
     // Ideally this goes to a "JoinGroup" modal or flow, but we can navigate to Main for now
-    navigation.replace('Main');
+    completeAuth();
   };
 
   const handleCreate = () => {
     // Ideally this goes to a "CreateGroup" modal or flow, but we can navigate to Main for now
-    navigation.replace('Main');
+    completeAuth();
   };
 
   return (
@@ -93,7 +114,7 @@ export default function JoinOrCreateScreen({ navigation }: any) {
       </View>
       
       <View style={styles.footer}>
-        <Pressable onPress={() => navigation.replace('Main')}>
+        <Pressable onPress={completeAuth}>
           <Text variant="body" color={COLORS.textSecondary}>Skip for now</Text>
         </Pressable>
       </View>

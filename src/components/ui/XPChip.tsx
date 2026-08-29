@@ -1,12 +1,11 @@
 import React, { useEffect } from 'react';
-import { View, StyleSheet } from 'react-native';
+import { StyleSheet } from 'react-native';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withTiming,
   withSpring,
   withDelay,
-  Easing,
   runOnJS,
 } from 'react-native-reanimated';
 import { COLORS, SIZES } from '@/constants/theme';
@@ -49,7 +48,7 @@ export function XPChip({ xp, onAnimationEnd }: XPChipProps) {
   }));
 
   return (
-    <Animated.View style={[styles.chip, animatedStyle]}>
+    <Animated.View style={[styles.chip, animatedStyle]} pointerEvents="none">
       <Text variant="body" color="#FFFFFF" style={styles.text}>
         +{xp} XP 🔥
       </Text>

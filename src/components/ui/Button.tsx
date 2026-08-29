@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Pressable, PressableProps, StyleSheet, Animated, ViewStyle } from 'react-native';
-import { COLORS, SHADOWS, SIZES, TYPOGRAPHY } from '@/constants/theme';
+import { COLORS, SHADOWS, SIZES } from '@/constants/theme';
 import { Text } from './Text';
 
 export interface ButtonProps extends PressableProps {
@@ -23,7 +23,7 @@ export function Button({
   const [isPressed, setIsPressed] = useState(false);
   
   // Physical push down animation
-  const translateY = new Animated.Value(0);
+  const translateY = useRef(new Animated.Value(0)).current;
 
   const handlePressIn = (e: any) => {
     setIsPressed(true);

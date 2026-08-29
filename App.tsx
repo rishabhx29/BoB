@@ -20,7 +20,7 @@ import RootNavigator from './src/navigation';
 import { queryClient } from './src/services/queryClient';
 
 // Keep the splash screen visible while fonts load
-SplashScreen.preventAutoHideAsync();
+SplashScreen.preventAutoHideAsync().catch(() => {});
 
 // Deep link config for invite codes: streakpact://join/XXXXXX
 const linking: any = {

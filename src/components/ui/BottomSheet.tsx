@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, StyleSheet, Modal, Pressable, Animated } from 'react-native';
+import { View, StyleSheet, Modal, Pressable } from 'react-native';
 import { COLORS, SHADOWS, SIZES } from '@/constants/theme';
 
 export interface BottomSheetProps {

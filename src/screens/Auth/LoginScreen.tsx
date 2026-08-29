@@ -43,7 +43,7 @@ export default function LoginScreen({ navigation }: any) {
       const token = await userCredential.user.getIdToken();
       
       // Save token and set user
-      await storage.setItem('streakpact_jwt', token);
+      await SecureStore.setItemAsync('streakpact_jwt', token);
       setUser({
         id: userCredential.user.uid,
         email: userCredential.user.email || '',
@@ -58,8 +58,6 @@ export default function LoginScreen({ navigation }: any) {
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       });
-
-      navigation.reset({ index: 0, routes: [{ name: 'Main' }] });
     } catch (error: any) {
       if (error.code === 'auth/invalid-credential') {
         setAuthError('Invalid email or password.');
@@ -74,6 +72,31 @@ export default function LoginScreen({ navigation }: any) {
   const handleGoogleLogin = () => {
     // TODO: Implement Expo AuthSession or React Native Google Sign In
     setAuthError('Google Sign-In coming soon!');
+  };
+
+  const handleGuestLogin = async () => {
+    setIsLoading(true);
+    try {
+      await SecureStore.setItemAsync('streakpact_jwt', 'guest-token');
+      setUser({
+        id: 'guest-user-001',
+        email: 'guest@streakpact.app',
+        username: 'GuestUser',
+        displayName: 'Guest Explorer',
+        avatarUrl: null,
+        level: 1,
+        xp: 0,
+        shieldsAvailable: 3,
+        totalSubmissions: 0,
+        longestStreak: 0,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+    } catch {
+      setAuthError('Something went wrong. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -146,6 +169,14 @@ export default function LoginScreen({ navigation }: any) {
             onPress={handleGoogleLogin} 
             style={styles.googleBtn}
           />
+
+          <Button 
+            label="🚀 Continue as Guest" 
+            variant="secondary"
+            onPress={handleGuestLogin} 
+            style={styles.guestBtn}
+            disabled={isLoading}
+          />
         </View>
 
         <View style={styles.footer}>
@@ -199,7 +230,11 @@ const styles = StyleSheet.create({
     marginVertical: 16,
   },
   googleBtn: {
+    marginBottom: 12,
+  },
+  guestBtn: {
     marginBottom: 24,
+    borderStyle: 'dashed' as any,
   },
   footer: {
     flexDirection: 'row',
