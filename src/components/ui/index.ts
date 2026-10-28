@@ -18,6 +18,7 @@ export * from './Icon';
 export * from './PhosphorIcon';
 export * from './MatrixGrid';
 export * from './HudPanel';
+export * from './ScreenHeader';
 
 // Animated components
 export * from './SkeletonLoader';
@@ -29,13 +30,7 @@ export * from './PasswordStrengthMeter';
 // Brand
 export * from '../brand/VoltMark';
 
-// Feed & groups: NOT re-exported from the barrel.
-// Import them directly: `import { FeedCard } from '@/components/feed/FeedCard'`
-// (re-exporting here creates a require cycle — see PR #123)
-export { FeedCard } from '../feed/FeedCard';
-export type { FeedCardProps, FeedCardSubmission } from '../feed/FeedCard';
-export { TodayBanner } from '../feed/TodayBanner';
-export type { TodayActivity, TodayStatus } from '../feed/TodayBanner';
+// Feed & groups: import these from their own modules.
 export { GroupCard } from '../groups/GroupCard';
 export type { GroupCardProps } from '../groups/GroupCard';
 export { ActivityCard } from '../groups/ActivityCard';
