@@ -11,10 +11,11 @@ import * as ImagePicker from 'expo-image-picker';
 import { useAuthStore } from '@/store/useAuthStore';
 import { userService } from '@/services/userService';
 import { uploadAvatar } from '@/services/supabase';
+import { isAppError } from '@/services/errors';
 
 type ProfileForm = ProfileFormValues;
 
-export default function SetupProfileScreen({ navigation }: any) {
+export default function SetupProfileScreen() {
   const [avatar, setAvatar] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [usernameError, setUsernameError] = useState<string | null>(null);
@@ -104,10 +105,20 @@ export default function SetupProfileScreen({ navigation }: any) {
         displayName: fallbackDisplayName,
         avatarUrl: finalAvatarUrl,
       });
+      // Marking the profile ready is the gate's signal to mount Main; the
+      // root navigator handles the transition, so there is nothing to navigate
+      // to here.
       setUser(saved);
-      navigation.replace('BiometricSetup');
     } catch (e: any) {
-      setUsernameError('Could not save profile. Please try again.');
+      if (isAppError(e) && e.code === 'USERNAME_TAKEN') {
+        setUsernameError('That username is already taken.');
+      } else if (isAppError(e) && e.code === 'USERNAME_INVALID') {
+        setUsernameError('Pick a different username.');
+      } else if (isAppError(e) && e.code === 'NOT_AUTHENTICATED') {
+        setUsernameError('Your session expired. Sign in again.');
+      } else {
+        setUsernameError(e?.message || 'Could not save profile. Please try again.');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -121,7 +132,7 @@ export default function SetupProfileScreen({ navigation }: any) {
       >
         <View style={styles.content}>
           <View style={styles.header}>
-            <Text variant="eyebrow" color={COLORS.textSecondary} style={styles.step}>Step 1 of 2</Text>
+            <Text variant="eyebrow" color={COLORS.textSecondary} style={styles.step}>One last step</Text>
             <Text variant="displaySm" color={COLORS.textPrimary} style={styles.title}>
               Set up your profile
             </Text>

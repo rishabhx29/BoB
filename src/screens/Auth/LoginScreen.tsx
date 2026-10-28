@@ -29,6 +29,7 @@ function mapSupabaseAuthError(err: any): AppError {
 export default function LoginScreen({ navigation }: any) {
   const [authError, setAuthError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const showDemoLogin = __DEV__;
   const { setSession } = useAuthStore();
 
   const { control, handleSubmit, formState: { errors } } = useForm<LoginForm>({
@@ -79,22 +80,6 @@ export default function LoginScreen({ navigation }: any) {
       } else {
         setAuthError(e?.message || 'Google sign-in failed');
       }
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleGuest = async () => {
-    setIsLoading(true);
-    try {
-      const { data, error } = await supabase.auth.signInAnonymously();
-      if (error) throw mapSupabaseAuthError(error);
-      if (data.session) {
-        await storage.setItem('streakpact_jwt', data.session.access_token);
-        setSession(data.session);
-      }
-    } catch (e: any) {
-      setAuthError(e?.message || 'Guest sign-in failed.');
     } finally {
       setIsLoading(false);
     }
@@ -203,13 +188,15 @@ export default function LoginScreen({ navigation }: any) {
             />
 
             <View style={{ height: 10 }} />
-            <Button
-              label="⚡ Quick Demo Sign In (Alex Rivera)"
-              variant="secondary"
-              onPress={handleDemoLogin}
-              disabled={isLoading}
-              fullWidth
-            />
+            {showDemoLogin ? (
+              <Button
+                label="⚡ Quick Demo Sign In (Alex Rivera)"
+                variant="secondary"
+                onPress={handleDemoLogin}
+                disabled={isLoading}
+                fullWidth
+              />
+            ) : null}
 
             <View style={styles.dividerRow}>
               <View style={styles.dividerLine} />
@@ -223,14 +210,6 @@ export default function LoginScreen({ navigation }: any) {
               leadingIcon="arrow-up-right"
               onPress={handleGoogle}
               fullWidth
-            />
-            <View style={{ height: 10 }} />
-            <Button
-              label="Continue as guest"
-              variant="ghost"
-              onPress={handleGuest}
-              fullWidth
-              disabled={isLoading}
             />
           </View>
 

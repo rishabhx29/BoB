@@ -55,7 +55,8 @@ export default function RegisterScreen({ navigation }: any) {
       if (signUpData.session) {
         await storage.setItem('streakpact_jwt', signUpData.session.access_token);
         setSession(signUpData.session);
-        navigation.replace('SetupProfile');
+        // The root navigator swaps to SetupProfile as soon as the new session
+        // is seen without a `public.users` row. No manual navigation here.
       } else {
         // Email confirmation required — show dedicated verification screen.
         setEmailSent(data.email);

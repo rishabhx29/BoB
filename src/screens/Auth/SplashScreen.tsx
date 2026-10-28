@@ -13,23 +13,23 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text } from '@/components/ui';
 import { COLORS } from '@/constants/theme';
 import { VoltMark } from '@/components/brand/VoltMark';
-import { storage } from '@/utils/storage';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuthStore } from '@/store/useAuthStore';
-import { supabase } from '@/services/supabase';
-import { userService } from '@/services/userService';
 import Constants from 'expo-constants';
 
 const { width } = Dimensions.get('window');
 
+const BOOT_POLL_MS = 250;
+const BOOT_POLL_ATTEMPTS = 20;
+
 export default function SplashScreen({ navigation }: any) {
-  const { setUser, setSession } = useAuthStore();
   const markScale = useSharedValue(0.6);
   const markOpacity = useSharedValue(0);
   const markRotate = useSharedValue(-15);
   const wordOpacity = useSharedValue(0);
   const wordY = useSharedValue(8);
   const tagOpacity = useSharedValue(0);
+  const cancelled = useRef(false);
 
   useEffect(() => {
     // Mark entrance: scale + rotate, settle
@@ -47,39 +47,39 @@ export default function SplashScreen({ navigation }: any) {
     // Tag
     tagOpacity.value = withDelay(700, withTiming(0.6, { duration: 320 }));
 
-    const timeout = setTimeout(() => finishSplash(), 1500);
-    return () => clearTimeout(timeout);
+    const timeout = setTimeout(() => void finishSplash(), 1500);
+    return () => {
+      cancelled.current = true;
+      clearTimeout(timeout);
+    };
   }, []);
 
+  /**
+   * Session restoration belongs to `useAuthSync`; the root navigator swaps to
+   * Main or SetupProfile on its own. This screen only decides which
+   * unauthenticated screen comes first.
+   */
   const finishSplash = async () => {
-    try {
-      // 1) Recover Supabase session
-      const { data: sessionData } = await supabase.auth.getSession();
-      const session = sessionData.session;
-      const onboardingCompleted = await AsyncStorage.getItem('onboarding_completed');
-
-      if (session) {
-        // 2) Restore the JWT in secure storage
-        await storage.setItem('streakpact_jwt', session.access_token);
-        setSession(session);
-
-        // 3) Try to hydrate the user profile row
-        const profile = await userService.fetchCurrentUser();
-        if (profile) {
-          setUser(profile);
-        } else {
-          // Session exists but no profile yet â€” send to setup
-          navigation.replace('SetupProfile');
-          return;
-        }
-      } else if (onboardingCompleted === 'true') {
-        navigation.replace('Login');
-      } else {
-        navigation.replace('Onboarding');
+    // Give the boot-time session restore a moment to finish, so a returning
+    // user sees the splash instead of a flash of the login form.
+    for (let attempt = 0; attempt < BOOT_POLL_ATTEMPTS; attempt += 1) {
+      const { isLoading, session } = useAuthStore.getState();
+      if (!isLoading) {
+        if (session) return;
+        break;
       }
-    } catch (e) {
-      console.warn('Splash init error:', e);
-      navigation.replace('Onboarding');
+      await new Promise((resolve) => setTimeout(resolve, BOOT_POLL_MS));
+      if (cancelled.current) return;
+    }
+
+    if (cancelled.current) return;
+
+    try {
+      const onboardingCompleted = await AsyncStorage.getItem('onboarding_completed');
+      if (cancelled.current) return;
+      navigation.replace(onboardingCompleted === 'true' ? 'Login' : 'Onboarding');
+    } catch {
+      if (!cancelled.current) navigation.replace('Onboarding');
     }
   };
 
