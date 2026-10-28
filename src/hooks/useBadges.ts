@@ -8,7 +8,8 @@ import { AppError } from '@/services/errors';
  * React Query hooks for badges.
  *
  * `badges` table is public-read (seeded in schema.sql). `user_badges` is
- * user-scoped via RLS. Awarding badges happens via Edge Function (Phase 8).
+ * user-scoped via RLS. Awarding badges happens in the `evaluate-badges` edge
+ * function.
  */
 
 function mapBadgeRow(row: any): BadgeDefinition {

@@ -12,6 +12,9 @@ import {
   updateGroup,
 } from '@/services/groupService';
 import { STALE_TIMES } from '@/services/queryClient';
+import { PUBLIC_USER_COLUMNS } from '@/services/userColumns';
+
+const GROUP_MEMBER_USER_SELECT = `user:users!group_members_user_id_fkey(${PUBLIC_USER_COLUMNS})`;
 import { ActivitySeed, UpdateGroupInput } from '@/types';
 import { useAuthStore } from '@/store/useAuthStore';
 import {
@@ -180,7 +183,10 @@ export interface LeaderboardEntry {
   displayName: string;
   username: string;
   avatarUrl: string | null;
+  /** Lifetime XP — profile stat. */
   xp: number;
+  /** XP earned inside these pacts since the 1st of the current month. */
+  monthlyXp: number;
   level: number;
   longestStreak: number;
   groupId: string;
@@ -218,12 +224,32 @@ export function useMyGroupMembers() {
           user_id,
           group_id,
           group:groups(id, name),
-          user:users(*)
+          ${GROUP_MEMBER_USER_SELECT}
         `)
         .in('group_id', groupIds);
       if (aErr) throw aErr;
 
-      // 3) Deduplicate by user_id (keep the first group encountered)
+      // 3) Sum XP earned this month across the user's pacts
+      const monthStart = new Date();
+      monthStart.setUTCDate(1);
+      monthStart.setUTCHours(0, 0, 0, 0);
+
+      const { data: monthSubs, error: sErr } = await supabaseClient
+        .from('submissions')
+        .select('user_id, xp_earned')
+        .in('group_id', groupIds)
+        .gte('client_timestamp', monthStart.toISOString());
+      if (sErr) throw sErr;
+
+      const monthlyXp = new Map<string, number>();
+      for (const sub of (monthSubs ?? []) as any[]) {
+        monthlyXp.set(
+          sub.user_id,
+          (monthlyXp.get(sub.user_id) ?? 0) + (sub.xp_earned ?? 0)
+        );
+      }
+
+      // 4) Deduplicate by user_id (keep the first group encountered)
       const seen = new Set<string>();
       const entries: LeaderboardEntry[] = [];
       for (const m of (allMembers ?? []) as any[]) {
@@ -235,6 +261,7 @@ export function useMyGroupMembers() {
           username: m.user.username ?? 'member',
           avatarUrl: m.user.avatar_url ?? null,
           xp: m.user.xp ?? 0,
+          monthlyXp: monthlyXp.get(m.user_id) ?? 0,
           level: m.user.level ?? 1,
           longestStreak: m.user.longest_streak ?? 0,
           groupId: m.group?.id ?? m.group_id,
