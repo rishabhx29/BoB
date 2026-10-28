@@ -5,17 +5,27 @@
 
 // ─── User ────────────────────────────────────────────────────────────────────
 
+export interface NotificationPreferences {
+  pushEnabled: boolean;
+  streakReminders: boolean;
+  socialActivity: boolean;
+  nudges: boolean;
+  weeklyRecap: boolean;
+}
+
 export interface User {
-  id: string;                     // Firebase UID / Supabase UUID
+  id: string;                     // auth.users UUID
   email: string;
   username: string;
   displayName: string;
   avatarUrl: string | null;
+  bio: string | null;
   xp: number;
   level: number;                  // 1–7
   totalSubmissions: number;
   longestStreak: number;
   shieldsAvailable: number;       // 0–3
+  notificationPreferences: NotificationPreferences;
   createdAt: string;              // ISO timestamp
   updatedAt: string;
 }
@@ -178,6 +188,15 @@ export interface Nudge {
   sender?: User;
 }
 
+/** Submission joined with the display data the feed card needs. */
+export interface FeedItem extends Submission {
+  groupName: string;
+  groupColor: string;
+  streakCount: number;
+  initialReactions: Reaction[];
+  commentCount: number;
+}
+
 // ─── Notification ─────────────────────────────────────────────────────────────
 
 export type NotificationType =
@@ -193,7 +212,8 @@ export type NotificationType =
   | 'weekly_wrapup'
   | 'badge_earned'
   | 'level_up'
-  | 'shield_earned';
+  | 'shield_earned'
+  | 'system';
 
 export interface AppNotification {
   id: string;
@@ -214,6 +234,14 @@ export interface DayStatus {
   date: string;                   // YYYY-MM-DD
   status: StreakStatus;
   submissionId?: string;
+}
+
+/** One activity card in the home "Today" banner. */
+export interface TodayActivityItem {
+  activity: Activity;
+  group: Group;
+  submission: Submission | null;
+  streak: number;
 }
 
 // ─── Service Input Types ─────────────────────────────────────────────────────
@@ -281,9 +309,6 @@ export type AuthStackParamList = {
   Onboarding: undefined;
   Login: undefined;
   Register: undefined;
-  SetupProfile: undefined;
-  JoinOrCreate: undefined;
-  BiometricSetup: undefined;
 };
 
 export type MainTabParamList = {
@@ -296,7 +321,14 @@ export type MainTabParamList = {
 
 export type RootStackParamList = {
   Auth: undefined;
+  Loading: undefined;
+  SetupProfile: undefined;
   Main: undefined;
+  Notifications: undefined;
+  Settings: undefined;
+  EditProfile: undefined;
+  Badges: undefined;
+  SubmissionDetail: { submissionId: string };
   CreateGroup: undefined;
   JoinGroup: { code?: string } | undefined;
   GroupHome: { groupId: string; groupName?: string; groupEmoji?: string };
