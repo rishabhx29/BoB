@@ -1,6 +1,7 @@
 import { supabase } from './supabase';
 import { useAuthStore } from '@/store/useAuthStore';
 import { AppError } from './errors';
+import { firstRow, isRpcError } from './rpc';
 import { Streak, User, Activity } from '@/types';
 import { StreakMember } from '@/components/ui/StreakSummaryBar';
 import { DuelMember } from '@/components/ui/ComparativeView';
@@ -34,6 +35,10 @@ function mapStreakRow(row: Record<string, any>): Streak {
 function requireCurrentUserId(): string {
   const storeUser = useAuthStore.getState().user;
   if (storeUser?.id) return storeUser.id;
+
+  const sessionUserId = useAuthStore.getState().session?.user?.id;
+  if (sessionUserId) return sessionUserId;
+
   throw new AppError('NOT_AUTHENTICATED', 'You must be logged in to perform this action');
 }
 
@@ -85,71 +90,41 @@ export async function declareRestDay(
   activityId: string,
   targetDateStr?: string
 ): Promise<Streak> {
-  const userId = requireCurrentUserId();
-  const today = new Date().toISOString().slice(0, 10);
-  const dateStr = targetDateStr || today;
+  requireCurrentUserId();
 
-  if (dateStr < today) {
-    throw new AppError('NOT_ALLOWED', 'Cannot backdate a rest day declaration.');
-  }
-
-  // Fetch or initialize streak
-  let streak = await fetchStreak(userId, activityId);
-  const currentRestDays = streak?.restDayDates ?? [];
-
-  if (currentRestDays.includes(dateStr)) {
-    return streak!;
-  }
-
-  // Calculate start of current week (Monday) and end (Sunday)
-  const targetDate = new Date(dateStr);
-  const dayOfWeek = targetDate.getDay(); // 0 = Sun, 1 = Mon ...
-  const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
-  const monday = new Date(targetDate);
-  monday.setDate(targetDate.getDate() + diffToMonday);
-  const sunday = new Date(monday);
-  sunday.setDate(monday.getDate() + 6);
-
-  const monStr = monday.toISOString().slice(0, 10);
-  const sunStr = sunday.toISOString().slice(0, 10);
-
-  const thisWeekRestDays = currentRestDays.filter(
-    (d) => d >= monStr && d <= sunStr
-  );
-
-  if (thisWeekRestDays.length >= 2) {
-    throw new AppError(
-      'VALIDATION',
-      'Maximum 2 rest days allowed per week for this activity.'
-    );
-  }
-
-  const updatedRestDays = [...currentRestDays, dateStr].sort();
-
-  const { data, error } = await supabase
-    .from('streaks')
-    .upsert(
-      {
-        user_id: userId,
-        activity_id: activityId,
-        current_streak: streak?.currentStreak ?? 0,
-        longest_streak: streak?.longestStreak ?? 0,
-        last_submission_date: streak?.lastSubmissionDate ?? null,
-        shield_used_dates: streak?.shieldUsedDates ?? [],
-        rest_day_dates: updatedRestDays,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: 'user_id,activity_id' }
-    )
-    .select()
-    .single();
+  const { data, error } = await supabase.rpc('declare_rest_day', {
+    p_activity_id: activityId,
+    p_target_date: targetDateStr ?? null,
+  });
 
   if (error) {
+    if (isRpcError(error, 'rest_day_backdated')) {
+      throw new AppError('NOT_ALLOWED', 'Cannot backdate a rest day declaration.');
+    }
+    if (isRpcError(error, 'rest_day_limit')) {
+      throw new AppError(
+        'VALIDATION',
+        'Maximum 2 rest days allowed per week for this activity.'
+      );
+    }
+    if (isRpcError(error, 'not_authenticated')) {
+      throw new AppError('NOT_AUTHENTICATED', 'You must be logged in to declare a rest day');
+    }
+    if (isRpcError(error, 'not_allowed')) {
+      throw new AppError('NOT_ALLOWED', 'You are not a member of this pact');
+    }
+    if (isRpcError(error, 'activity_not_found')) {
+      throw new AppError('NOT_FOUND', 'Activity not found');
+    }
     console.error(`${LOG_PREFIX} declareRestDay failed:`, error);
     throw new AppError('NETWORK', error.message);
   }
 
-  return mapStreakRow(data);
+  const row = firstRow<Record<string, any>>(data);
+  if (!row) {
+    throw new AppError('NETWORK', 'Failed to declare rest day');
+  }
+  return mapStreakRow(row);
 }
 
 // ─── 6.3 Streak Shield Logic ─────────────────────────────────────────────────
@@ -164,69 +139,47 @@ export async function consumeStreakShield(
   activityId: string,
   missedDateStr: string
 ): Promise<Streak> {
-  const userId = requireCurrentUserId();
+  requireCurrentUserId();
 
-  // 1. Check user shields
-  const { data: userRow, error: userErr } = await supabase
-    .from('users')
-    .select('shields_available')
-    .eq('id', userId)
-    .single();
-
-  if (userErr || !userRow) {
-    throw new AppError('NOT_FOUND', 'User profile not found');
-  }
-
-  if ((userRow.shields_available ?? 0) <= 0) {
-    throw new AppError('NOT_ALLOWED', 'No streak shields available to consume.');
-  }
-
-  // 2. Check streak shield cooldown (max 1 per activity in last 7 days)
-  const streak = await fetchStreak(userId, activityId);
-  const usedDates = streak?.shieldUsedDates ?? [];
-
-  const sevenDaysAgo = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
-  const recentUsed = usedDates.filter((d) => d >= sevenDaysAgo);
-
-  if (recentUsed.length > 0) {
-    throw new AppError(
-      'NOT_ALLOWED',
-      'Streak shields can only be used once per activity every 7 days.'
-    );
-  }
-
-  // 3. Deduct shield from user
-  await supabase
-    .from('users')
-    .update({ shields_available: (userRow.shields_available ?? 1) - 1 })
-    .eq('id', userId);
-
-  // 4. Update streak record
-  const updatedUsed = [...usedDates, missedDateStr].sort();
-  const { data, error } = await supabase
-    .from('streaks')
-    .upsert(
-      {
-        user_id: userId,
-        activity_id: activityId,
-        current_streak: streak?.currentStreak ?? 1,
-        longest_streak: streak?.longestStreak ?? 1,
-        last_submission_date: streak?.lastSubmissionDate ?? null,
-        shield_used_dates: updatedUsed,
-        rest_day_dates: streak?.restDayDates ?? [],
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: 'user_id,activity_id' }
-    )
-    .select()
-    .single();
+  const { data, error } = await supabase.rpc('consume_streak_shield', {
+    p_activity_id: activityId,
+    p_missed_date: missedDateStr,
+  });
 
   if (error) {
+    if (isRpcError(error, 'no_shields')) {
+      throw new AppError('NOT_ALLOWED', 'No streak shields available to consume.');
+    }
+    if (isRpcError(error, 'shield_cooldown') || isRpcError(error, 'shield_already_used')) {
+      throw new AppError(
+        'NOT_ALLOWED',
+        'Streak shields can only be used once per activity every 7 days.'
+      );
+    }
+    if (isRpcError(error, 'not_authenticated')) {
+      throw new AppError('NOT_AUTHENTICATED', 'You must be logged in to use a shield');
+    }
+    if (isRpcError(error, 'not_allowed')) {
+      throw new AppError('NOT_ALLOWED', 'You are not a member of this pact');
+    }
+    if (isRpcError(error, 'invalid_date')) {
+      throw new AppError('VALIDATION', 'That date cannot be shielded.');
+    }
+    if (isRpcError(error, 'activity_not_found')) {
+      throw new AppError('NOT_FOUND', 'Activity not found');
+    }
+    if (isRpcError(error, 'user_not_found')) {
+      throw new AppError('NOT_FOUND', 'User profile not found');
+    }
     console.error(`${LOG_PREFIX} consumeStreakShield failed:`, error);
     throw new AppError('NETWORK', error.message);
   }
 
-  return mapStreakRow(data);
+  const row = firstRow<Record<string, any>>(data);
+  if (!row) {
+    throw new AppError('NETWORK', 'Failed to consume streak shield');
+  }
+  return mapStreakRow(row);
 }
 
 // ─── 6.4 Calendar & Tracker Aggregation Queries ──────────────────────────────
