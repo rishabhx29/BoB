@@ -1,105 +1,188 @@
 import React from 'react';
-import { View, ScrollView, StyleSheet, Pressable } from 'react-native';
+import {
+  ActivityIndicator,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  View,
+} from 'react-native';
 import { Text } from './Text';
 import { COLORS, SPACE, RADIUS } from '@/constants/theme';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { mockTodayActivities } from '@/hooks/useMockFeed';
-import { useNavigation } from '@react-navigation/native';
+import { TodayActivityItem } from '@/types';
+import { formatDistanceToNow } from 'date-fns';
 
-export function TodayBanner() {
-  const navigation = useNavigation<any>();
+type Props = {
+  items: TodayActivityItem[];
+  isLoading: boolean;
+  isError: boolean;
+  onPressActivity: (activityId: string, groupId: string) => void;
+  onExplorePacts: () => void;
+};
+
+/**
+ * Real "Today" board: the user's activities that are due today (or were
+ * already logged today). Tapping a card opens the real activity in the
+ * submission flow.
+ */
+export function TodayBanner({
+  items,
+  isLoading,
+  isError,
+  onPressActivity,
+  onExplorePacts,
+}: Props) {
+  const doneCount = items.filter((item) => Boolean(item.submission)).length;
 
   return (
     <View style={styles.container}>
-      <Text variant="headingMd" color={COLORS.textPrimary} style={styles.title}>
-        Today
-      </Text>
-      
-      <ScrollView 
-        horizontal 
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
-      >
-        {mockTodayActivities.map((activity) => {
-          const isPending = activity.status === 'pending';
-          // Calculate progress bounded between 0 and 1
-          const progressRaw = activity.currentValue / activity.limitValue;
-          const progress = Math.min(Math.max(progressRaw, 0), 1);
-          
-          return (
-            <Pressable 
-              key={activity.id}
-              onPress={() => {
-                navigation.navigate('SubmissionFlow', { activityId: activity.id });
-              }}
-              style={({ pressed }) => [
-                styles.activityCard,
-                pressed && styles.pressed
-              ]}
-            >
-              {/* Header: Icon & Name */}
-              <View style={styles.cardHeader}>
-                <View style={styles.headerLeft}>
-                  <View style={[styles.iconContainer, { backgroundColor: `${activity.color}20` }]}>
-                    <MaterialCommunityIcons 
-                      name={activity.icon as any} 
-                      size={18} 
-                      color={activity.color} 
-                    />
-                  </View>
-                  <Text variant="body" color={COLORS.textPrimary} style={styles.activityName} numberOfLines={1}>
-                    {activity.name}
-                  </Text>
-                </View>
-              </View>
+      <View style={styles.titleRow}>
+        <Text variant="headingMd" color={COLORS.textPrimary}>
+          Today
+        </Text>
+        {items.length > 0 && (
+          <Text variant="caption" color={COLORS.textTertiary}>
+            {doneCount}/{items.length} done
+          </Text>
+        )}
+      </View>
 
-              {/* Progress Text & Status Badge */}
-              <View style={styles.statsRow}>
-                <View style={styles.progressTextWrap}>
-                  <Text variant="headingSm" color={COLORS.textPrimary}>
-                    {activity.currentValue}
-                  </Text>
-                  <Text variant="caption" color={COLORS.textSecondary}>
-                    {' '} / {activity.limitValue} {activity.unit}
-                  </Text>
-                </View>
+      {isLoading ? (
+        <View style={styles.statusCard}>
+          <ActivityIndicator color={COLORS.accentBlue} size="small" />
+          <Text variant="caption" color={COLORS.textSecondary}>
+            Loading today's habits…
+          </Text>
+        </View>
+      ) : isError && items.length === 0 ? (
+        <View style={styles.statusCard}>
+          <Text style={styles.statusEmoji}>⚠️</Text>
+          <Text variant="caption" color={COLORS.textSecondary}>
+            Couldn't load today's habits. Pull down to retry.
+          </Text>
+        </View>
+      ) : items.length === 0 ? (
+        <Pressable
+          onPress={onExplorePacts}
+          style={({ pressed }) => [styles.statusCard, pressed && styles.pressed]}
+          accessibilityRole="button"
+          accessibilityLabel="Nothing due today. Open your pacts."
+        >
+          <Text style={styles.statusEmoji}>🌤️</Text>
+          <View style={styles.statusTextBlock}>
+            <Text variant="body" color={COLORS.textPrimary}>
+              Nothing due today
+            </Text>
+            <Text variant="caption" color={COLORS.textSecondary}>
+              Take the win — or add a new activity to a pact.
+            </Text>
+          </View>
+          <Text variant="caption" color={COLORS.accentBlue} style={styles.statusCta}>
+            Open
+          </Text>
+        </Pressable>
+      ) : (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.scrollContent}
+        >
+          {items.map(({ activity, group, submission, streak }) => {
+            const isDone = Boolean(submission);
+            const timeAgo = submission
+              ? formatRelative(submission.clientTimestamp)
+              : null;
 
-                <View style={[
-                  styles.statusBadge, 
-                  { backgroundColor: isPending ? `${COLORS.warning}15` : `${COLORS.success}15` }
-                ]}>
-                  <Text 
-                    variant="caption" 
-                    style={{ 
-                      color: isPending ? COLORS.warning : COLORS.success,
-                      fontWeight: '700',
-                      textTransform: 'uppercase',
-                      fontSize: 10
-                    }}
+            return (
+              <Pressable
+                key={activity.id}
+                onPress={() => onPressActivity(activity.id, group.id)}
+                style={({ pressed }) => [styles.activityCard, pressed && styles.pressed]}
+                accessibilityRole="button"
+                accessibilityLabel={`${activity.name}, ${isDone ? 'done' : 'pending'}`}
+              >
+                <View style={styles.cardHeader}>
+                  <View
+                    style={[
+                      styles.iconContainer,
+                      { backgroundColor: `${activity.color || COLORS.accentBlue}20` },
+                    ]}
                   >
-                    {isPending ? 'Pending' : 'Done'}
+                    <Text style={styles.iconText}>{activity.icon || '⚡'}</Text>
+                  </View>
+                  <View style={styles.nameBlock}>
+                    <Text
+                      variant="body"
+                      color={COLORS.textPrimary}
+                      style={styles.activityName}
+                      numberOfLines={1}
+                    >
+                      {activity.name}
+                    </Text>
+                    <Text variant="caption" color={COLORS.textTertiary} numberOfLines={1}>
+                      {group.emoji ? `${group.emoji} ` : ''}
+                      {group.name}
+                    </Text>
+                  </View>
+                  <View
+                    style={[
+                      styles.statusBadge,
+                      {
+                        backgroundColor: isDone
+                          ? `${COLORS.success}15`
+                          : `${COLORS.warning}15`,
+                      },
+                    ]}
+                  >
+                    <Text
+                      variant="caption"
+                      style={[
+                        styles.statusBadgeText,
+                        { color: isDone ? COLORS.success : COLORS.warning },
+                      ]}
+                    >
+                      {isDone ? 'Done' : 'Pending'}
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={styles.metaRow}>
+                  <Text variant="caption" color={COLORS.textSecondary} numberOfLines={1}>
+                    {isDone
+                      ? `${timeAgo}${submission?.xpEarned ? ` • +${submission.xpEarned} XP` : ''}`
+                      : streak > 0
+                        ? `🔥 ${streak}-day streak on the line`
+                        : 'Tap to log proof'}
                   </Text>
                 </View>
-              </View>
 
-              {/* Progress Bar */}
-              <View style={styles.progressBarBg}>
-                <View 
-                  style={[
-                    styles.progressBarFill, 
-                    { 
-                      width: `${progress * 100}%`,
-                      backgroundColor: isPending ? activity.color : COLORS.success 
-                    }
-                  ]} 
-                />
-              </View>
-            </Pressable>
-          );
-        })}
-      </ScrollView>
+                <View style={styles.progressTrack}>
+                  <View
+                    style={[
+                      styles.progressFill,
+                      {
+                        width: isDone ? '100%' : '0%',
+                        backgroundColor: COLORS.success,
+                      },
+                    ]}
+                  />
+                </View>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+      )}
     </View>
   );
+}
+
+function formatRelative(timestamp: string): string {
+  const date = new Date(timestamp);
+  if (Number.isNaN(date.getTime())) return 'Logged today';
+  try {
+    return formatDistanceToNow(date, { addSuffix: true });
+  } catch {
+    return 'Logged today';
+  }
 }
 
 const styles = StyleSheet.create({
@@ -109,16 +192,19 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: COLORS.hairline,
   },
-  title: {
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: SPACE.lg,
     marginBottom: SPACE.sm,
   },
   scrollContent: {
     paddingHorizontal: SPACE.lg,
-    gap: SPACE.md, // slightly larger gap for cards
+    gap: SPACE.md,
   },
   activityCard: {
-    width: 220,
+    width: 240,
     backgroundColor: COLORS.bgPanel,
     padding: SPACE.md,
     borderRadius: RADIUS.lg,
@@ -132,49 +218,66 @@ const styles = StyleSheet.create({
   cardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
     gap: SPACE.sm,
-    flex: 1,
   },
   iconContainer: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  activityName: {
-    fontWeight: '600',
+  iconText: {
+    fontSize: 17,
+  },
+  nameBlock: {
     flex: 1,
   },
-  statsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: 4,
-  },
-  progressTextWrap: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
+  activityName: {
+    fontWeight: '600',
   },
   statusBadge: {
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: RADIUS.pill,
   },
-  progressBarBg: {
-    height: 6,
+  statusBadgeText: {
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    fontSize: 10,
+  },
+  metaRow: {
+    minHeight: 18,
+  },
+  progressTrack: {
+    height: 4,
     backgroundColor: COLORS.bgSurface,
-    borderRadius: 3,
-    marginTop: 4,
+    borderRadius: 2,
     overflow: 'hidden',
   },
-  progressBarFill: {
+  progressFill: {
     height: '100%',
-    borderRadius: 3,
-  }
+    borderRadius: 2,
+  },
+  statusCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACE.sm,
+    marginHorizontal: SPACE.lg,
+    paddingVertical: SPACE.md,
+    paddingHorizontal: SPACE.md,
+    backgroundColor: COLORS.bgPanel,
+    borderRadius: RADIUS.lg,
+    borderWidth: 1,
+    borderColor: COLORS.hairline,
+  },
+  statusEmoji: {
+    fontSize: 20,
+  },
+  statusTextBlock: {
+    flex: 1,
+  },
+  statusCta: {
+    fontWeight: '700',
+  },
 });

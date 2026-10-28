@@ -7,13 +7,16 @@ import { Input } from './Input';
 import { BottomSheet } from './BottomSheet';
 import { COLORS, SPACE, RADIUS } from '@/constants/theme';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { MockFeedItem } from '@/hooks/useMockFeed';
+import { FeedItem, Reaction } from '@/types';
 import { ReactionPicker } from '../social/ReactionPicker';
 import { CommentSection } from '../social/CommentSection';
 import { WhoReactedSheet } from '../social/WhoReactedSheet';
 import { formatDistanceToNow } from 'date-fns';
 
-import { toggleSubmissionReaction } from '@/services/reactionService';
+import {
+  toggleSubmissionReaction,
+  subscribeToSubmissionReactions,
+} from '@/services/reactionService';
 import {
   addSubmissionComment,
   fetchSubmissionComments,
@@ -25,10 +28,12 @@ import { useAuthStore } from '@/store/useAuthStore';
 import { useUpdateSubmission, useDeleteSubmission } from '@/hooks/useSubmissions';
 
 type Props = {
-  item: MockFeedItem;
+  item: FeedItem;
+  /** Called after the author deletes the proof, so hosts can leave the screen. */
+  onDeleted?: () => void;
 };
 
-export function FeedCard({ item }: Props) {
+export function FeedCard({ item, onDeleted }: Props) {
   const { user } = useAuthStore();
   const updateSubmissionMut = useUpdateSubmission();
   const deleteSubmissionMut = useDeleteSubmission();
@@ -43,16 +48,51 @@ export function FeedCard({ item }: Props) {
   const [editDescription, setEditDescription] = useState(item.description || '');
   const [isSavingEdit, setIsSavingEdit] = useState(false);
 
-  const [localComments, setLocalComments] = useState<{
-    id: string;
-    userId: string;
-    username: string;
-    avatarUrl: string | null;
-    text: string;
-    createdAt: string;
-  }[]>([]);
+  const [localComments, setLocalComments] = useState<SubmissionComment[]>([]);
+  const [reactions, setReactions] = useState<Reaction[]>(item.initialReactions ?? []);
 
   const isAuthor = Boolean(user?.id && item.userId === user.id);
+
+  // Seed reactions from the feed and keep the card in sync with server truth.
+  useEffect(() => {
+    setReactions(item.initialReactions ?? []);
+  }, [item.id, item.initialReactions]);
+
+  // Realtime reactions for this submission.
+  useEffect(() => {
+    const unsubscribe = subscribeToSubmissionReactions(item.id, (items) => {
+      setReactions(
+        items.map(({ userId, emoji, createdAt }) => ({
+          submissionId: item.id,
+          userId,
+          emoji,
+          createdAt,
+        }))
+      );
+    });
+    return unsubscribe;
+  }, [item.id]);
+
+  // Load + subscribe to comments only while the thread is open.
+  useEffect(() => {
+    if (!showComments) return;
+
+    let active = true;
+    fetchSubmissionComments(item.id)
+      .then((comments) => {
+        if (active) setLocalComments(comments);
+      })
+      .catch((err) => console.warn('[FeedCard] Error fetching comments:', err));
+
+    const unsubscribe = subscribeToSubmissionComments(item.id, (comments) => {
+      if (active) setLocalComments(comments);
+    });
+
+    return () => {
+      active = false;
+      unsubscribe();
+    };
+  }, [item.id, showComments]);
 
   // Calculate submission age
   const submissionTimestamp = new Date(item.clientTimestamp).getTime();
@@ -60,60 +100,82 @@ export function FeedCard({ item }: Props) {
   const canEdit = isAuthor && ageMs <= 60 * 60 * 1000; // 1-hour window
   const canDelete = isAuthor && ageMs <= 24 * 60 * 60 * 1000; // 24-hour window
 
-  // Subscribe to real comments
-  useEffect(() => {
-    let unsubscribe: (() => void) | undefined;
-    fetchSubmissionComments(item.id)
-      .then((comments) => {
-        if (comments && comments.length > 0) {
-          setLocalComments(comments);
-        }
-      })
-      .catch((err) => console.warn('[FeedCard] Error fetching comments:', err));
-
-    try {
-      unsubscribe = subscribeToSubmissionComments(item.id, (comments: SubmissionComment[]) => {
-        setLocalComments(comments);
-      });
-    } catch {}
-
-    return () => {
-      unsubscribe?.();
-    };
-  }, [item.id]);
-
   const handleAddComment = async (text: string) => {
-    const optimisticComment = {
-      id: `opt_${Date.now()}`,
-      userId: user?.id || 'me',
-      username: user?.username || 'me',
-      avatarUrl: user?.avatarUrl ?? null,
+    if (!user?.id) return;
+
+    const optimisticId = `opt_${Date.now()}`;
+    const optimisticComment: SubmissionComment = {
+      id: optimisticId,
+      submissionId: item.id,
+      userId: user.id,
+      username: user.username,
+      displayName: user.displayName,
+      avatarUrl: user.avatarUrl ?? null,
       text,
       createdAt: new Date().toISOString(),
     };
     setLocalComments((prev) => [...prev, optimisticComment]);
 
     try {
-      await addSubmissionComment(item.id, text);
-    } catch (err) {
-      console.warn('[FeedCard] Error saving comment:', err);
+      const saved = await addSubmissionComment(item.id, text);
+      setLocalComments((prev) =>
+        prev.map((comment) => (comment.id === optimisticId ? saved : comment))
+      );
+    } catch (err: any) {
+      setLocalComments((prev) => prev.filter((comment) => comment.id !== optimisticId));
+      Alert.alert('Comment Failed', err?.message || 'Could not post your comment.');
     }
   };
 
   const handleDeleteComment = async (commentId: string) => {
+    const removed = localComments.find((comment) => comment.id === commentId);
+    setLocalComments((prev) => prev.filter((comment) => comment.id !== commentId));
+
     try {
       await deleteSubmissionComment(item.id, commentId);
-      setLocalComments((prev) => prev.filter((c) => c.id !== commentId));
-    } catch (err) {
-      console.warn('[FeedCard] Error deleting comment:', err);
+    } catch (err: any) {
+      if (removed) {
+        setLocalComments((prev) =>
+          [...prev, removed].sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+        );
+      }
+      Alert.alert('Delete Failed', err?.message || 'Could not delete this comment.');
     }
   };
 
   const handleReact = async (emoji: string) => {
+    if (!user?.id) return;
+
+    const previous = reactions;
+    const nextEmoji = emoji as Reaction['emoji'];
+    const existing = reactions.find((reaction) => reaction.userId === user.id);
+
+    let next: Reaction[];
+    if (existing?.emoji === nextEmoji) {
+      next = reactions.filter((reaction) => reaction.userId !== user.id);
+    } else if (existing) {
+      next = reactions.map((reaction) =>
+        reaction.userId === user.id ? { ...reaction, emoji: nextEmoji } : reaction
+      );
+    } else {
+      next = [
+        ...reactions,
+        {
+          submissionId: item.id,
+          userId: user.id,
+          emoji: nextEmoji,
+          createdAt: new Date().toISOString(),
+        },
+      ];
+    }
+
+    // Optimistic update; roll back if the server rejects it.
+    setReactions(next);
     try {
       await toggleSubmissionReaction(item.id, emoji);
-    } catch (err) {
-      console.warn('[FeedCard] Error toggling reaction:', err);
+    } catch (err: any) {
+      setReactions(previous);
+      Alert.alert('Reaction Failed', err?.message || 'Could not save your reaction.');
     }
   };
 
@@ -150,6 +212,7 @@ export function FeedCard({ item }: Props) {
             try {
               await deleteSubmissionMut.mutateAsync(item.id);
               Alert.alert('Deleted', 'Your proof has been removed.');
+              onDeleted?.();
             } catch (err: any) {
               Alert.alert('Delete Failed', err.message || 'Could not delete proof');
             }
@@ -168,12 +231,19 @@ export function FeedCard({ item }: Props) {
   }
 
   // Count initial reactions by emoji
-  const reactionCounts = item.initialReactions.reduce((acc, rx) => {
-    acc[rx.emoji] = (acc[rx.emoji] || 0) + 1;
-    return acc;
-  }, {} as Record<string, number>);
+  const reactionCounts = React.useMemo(
+    () =>
+      reactions.reduce((acc, reaction) => {
+        acc[reaction.emoji] = (acc[reaction.emoji] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>),
+    [reactions]
+  );
 
-  const userReaction = item.initialReactions?.find((r) => r.userId === user?.id)?.emoji;
+  const userReaction = React.useMemo(
+    () => reactions.find((reaction) => reaction.userId === user?.id)?.emoji,
+    [reactions, user?.id]
+  );
 
   return (
     <View style={styles.card}>
@@ -258,12 +328,14 @@ export function FeedCard({ item }: Props) {
           </Pressable>
         </View>
 
-        <View style={styles.streakBadge}>
-          <Text style={styles.streakEmoji}>🔥</Text>
-          <Text variant="caption" style={styles.streakText}>
-            Day {item.streakCount}
-          </Text>
-        </View>
+        {item.streakCount > 0 && (
+          <View style={styles.streakBadge}>
+            <Text style={styles.streakEmoji}>🔥</Text>
+            <Text variant="caption" style={styles.streakText}>
+              Day {item.streakCount}
+            </Text>
+          </View>
+        )}
       </View>
 
       {/* Comments Expansion */}
