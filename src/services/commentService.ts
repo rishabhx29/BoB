@@ -1,15 +1,4 @@
-import { firestore, COLLECTIONS } from './firebase';
-import {
-  collection,
-  doc,
-  addDoc,
-  deleteDoc,
-  getDocs,
-  query,
-  orderBy,
-  limit,
-  onSnapshot,
-} from 'firebase/firestore';
+import { supabase } from './supabase';
 import { useAuthStore } from '@/store/useAuthStore';
 import { AppError } from './errors';
 
@@ -26,8 +15,30 @@ export interface SubmissionComment {
   createdAt: string;
 }
 
+function mapCommentRow(row: any): SubmissionComment {
+  return {
+    id: row.id,
+    submissionId: row.submission_id,
+    userId: row.user_id,
+    username: row.user?.username || 'member',
+    displayName: row.user?.display_name || row.user?.username || 'Squad Member',
+    avatarUrl: row.user?.avatar_url ?? null,
+    text: row.text,
+    createdAt: row.created_at,
+  };
+}
+
+const COMMENT_SELECT = `
+  id,
+  submission_id,
+  user_id,
+  text,
+  created_at,
+  user:users!comments_user_id_fkey(display_name, username, avatar_url)
+`;
+
 /**
- * Add a new comment to a submission thread in Firestore.
+ * Add a new comment to a submission thread.
  */
 export async function addSubmissionComment(
   submissionId: string,
@@ -42,67 +53,52 @@ export async function addSubmissionComment(
   if (!trimmed) {
     throw new AppError('VALIDATION', 'Comment cannot be empty');
   }
-
-  const commentData = {
-    submissionId,
-    userId: user.id,
-    username: user.username,
-    displayName: user.displayName,
-    avatarUrl: user.avatarUrl ?? null,
-    text: trimmed,
-    createdAt: new Date().toISOString(),
-  };
-
-  if (!firestore) {
-    console.warn(`${LOG_PREFIX} Firestore not configured, local comment returned`);
-    return { id: `local_${Date.now()}`, ...commentData };
+  if (trimmed.length > 500) {
+    throw new AppError('VALIDATION', 'Comments are limited to 500 characters');
   }
 
-  try {
-    const colRef = collection(firestore, COLLECTIONS.comments(submissionId));
-    const docRef = await addDoc(colRef, commentData);
-    return { id: docRef.id, ...commentData };
-  } catch (err: any) {
-    console.error(`${LOG_PREFIX} Failed to add comment:`, err);
+  const { data, error } = await supabase
+    .from('comments')
+    .insert({
+      submission_id: submissionId,
+      user_id: user.id,
+      text: trimmed,
+    })
+    .select(COMMENT_SELECT)
+    .single();
+
+  if (error) {
+    console.error(`${LOG_PREFIX} Failed to add comment:`, error);
     throw new AppError('NETWORK', 'Failed to post comment');
   }
+
+  return mapCommentRow(data);
 }
 
 /**
- * Fetch comments for a specific submission.
+ * Fetch comments for a specific submission, oldest first.
  */
 export async function fetchSubmissionComments(
   submissionId: string,
   limitCount: number = 50
 ): Promise<SubmissionComment[]> {
-  if (!firestore) return [];
+  const { data, error } = await supabase
+    .from('comments')
+    .select(COMMENT_SELECT)
+    .eq('submission_id', submissionId)
+    .order('created_at', { ascending: true })
+    .limit(limitCount);
 
-  try {
-    const colRef = collection(firestore, COLLECTIONS.comments(submissionId));
-    const q = query(colRef, orderBy('createdAt', 'asc'), limit(limitCount));
-    const snap = await getDocs(q);
-
-    return snap.docs.map((d) => {
-      const data = d.data();
-      return {
-        id: d.id,
-        submissionId,
-        userId: data.userId,
-        username: data.username || 'member',
-        displayName: data.displayName || 'Member',
-        avatarUrl: data.avatarUrl ?? null,
-        text: data.text,
-        createdAt: data.createdAt || new Date().toISOString(),
-      };
-    });
-  } catch (err) {
-    console.warn(`${LOG_PREFIX} Failed to fetch comments:`, err);
-    return [];
+  if (error) {
+    console.error(`${LOG_PREFIX} Failed to fetch comments:`, error);
+    throw new AppError('NETWORK', 'Failed to load comments');
   }
+
+  return ((data ?? []) as any[]).map(mapCommentRow);
 }
 
 /**
- * Delete a comment from a submission thread (author or admin only).
+ * Delete a comment (author or pact admin — enforced by RLS).
  */
 export async function deleteSubmissionComment(
   submissionId: string,
@@ -113,57 +109,51 @@ export async function deleteSubmissionComment(
     throw new AppError('NOT_AUTHENTICATED', 'You must be logged in to delete comments');
   }
 
-  if (!firestore) return;
+  const { data, error } = await supabase
+    .from('comments')
+    .delete()
+    .eq('id', commentId)
+    .eq('submission_id', submissionId)
+    .select('id');
 
-  try {
-    const docRef = doc(firestore, `${COLLECTIONS.comments(submissionId)}/${commentId}`);
-    await deleteDoc(docRef);
-  } catch (err: any) {
-    console.error(`${LOG_PREFIX} Failed to delete comment:`, err);
+  if (error) {
+    console.error(`${LOG_PREFIX} Failed to delete comment:`, error);
     throw new AppError('NETWORK', 'Failed to delete comment');
+  }
+
+  if (!data || data.length === 0) {
+    throw new AppError('NOT_ALLOWED', 'You cannot delete this comment');
   }
 }
 
 /**
- * Subscribe to real-time comment updates for a submission.
+ * Subscribe to realtime comment changes for one submission.
+ * The callback receives the fresh, full thread.
+ * Returns an unsubscribe function.
  */
 export function subscribeToSubmissionComments(
   submissionId: string,
   callback: (comments: SubmissionComment[]) => void
 ): () => void {
-  if (!firestore) {
-    return () => {};
-  }
-
-  try {
-    const colRef = collection(firestore, COLLECTIONS.comments(submissionId));
-    const q = query(colRef, orderBy('createdAt', 'asc'), limit(50));
-
-    return onSnapshot(
-      q,
-      (snap) => {
-        const comments: SubmissionComment[] = snap.docs.map((d) => {
-          const data = d.data();
-          return {
-            id: d.id,
-            submissionId,
-            userId: data.userId,
-            username: data.username || 'member',
-            displayName: data.displayName || 'Member',
-            avatarUrl: data.avatarUrl ?? null,
-            text: data.text,
-            createdAt: data.createdAt || new Date().toISOString(),
-          };
-        });
-        callback(comments);
+  const channel = supabase
+    .channel(`comments-${submissionId}-${Math.random().toString(36).slice(2, 8)}`)
+    .on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'comments',
+        filter: `submission_id=eq.${submissionId}`,
       },
-      (err) => {
-        console.warn(`${LOG_PREFIX} Comment subscription error:`, err);
+      () => {
+        fetchSubmissionComments(submissionId)
+          .then(callback)
+          .catch((err) => console.warn(`${LOG_PREFIX} Realtime refetch failed:`, err));
       }
-    );
-  } catch (err) {
-    console.warn(`${LOG_PREFIX} Error creating comment subscription:`, err);
-    return () => {};
-  }
-}
+    )
+    .subscribe();
 
+  return () => {
+    void supabase.removeChannel(channel);
+  };
+}

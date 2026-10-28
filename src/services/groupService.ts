@@ -2,6 +2,9 @@ import type { PostgrestError } from '@supabase/supabase-js';
 import { supabase } from '@/services/supabase';
 import { useAuthStore } from '@/store/useAuthStore';
 import { AppError, isAppError } from '@/services/errors';
+import { firstRow, isRpcError } from '@/services/rpc';
+import { PUBLIC_USER_COLUMNS } from '@/services/userColumns';
+import { mapUserRow } from '@/services/userService';
 import {
   Activity,
   ActivitySeed,
@@ -10,7 +13,6 @@ import {
   Group,
   GroupMember,
   UpdateGroupInput,
-  User,
 } from '@/types';
 
 /**
@@ -19,6 +21,7 @@ import {
  */
 
 const LOG_PREFIX = '[groupService]';
+const GROUP_MEMBERS_SELECT = `*, group_members(*, user:users!group_members_user_id_fkey(${PUBLIC_USER_COLUMNS}))`;
 const INVITE_CHARSET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'; // no ambiguous chars
 const INVITE_CODE_LENGTH = 6;
 const MAX_INVITE_ATTEMPTS = 5;
@@ -52,23 +55,6 @@ function mapMemberRow(row: Record<string, any>): GroupMember {
     role: row.role,
     joinedAt: row.joined_at,
     user: row.user ? mapUserRow(row.user) : undefined,
-  };
-}
-
-function mapUserRow(row: Record<string, any>): User {
-  return {
-    id: row.id,
-    email: row.email,
-    username: row.username,
-    displayName: row.display_name,
-    avatarUrl: row.avatar_url ?? null,
-    xp: row.xp ?? 0,
-    level: row.level ?? 1,
-    totalSubmissions: row.total_submissions ?? 0,
-    longestStreak: row.longest_streak ?? 0,
-    shieldsAvailable: row.shields_available ?? 0,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
   };
 }
 
@@ -179,116 +165,80 @@ export async function createGroup(
   selectedTemplates?: ActivitySeed[]
 ): Promise<Group> {
   try {
-    const userId = getCurrentUserId();
+    getCurrentUserId();
 
-    for (let attempt = 0; attempt < MAX_INVITE_ATTEMPTS; attempt++) {
-      const inviteCode = generateInviteCode();
-      const { data, error } = await supabase
-        .from('groups')
-        .insert({
-          name: input.name,
-          emoji: input.emoji,
-          vibe: input.vibe,
-          goal_description: input.goalDescription,
-          admin_id: userId,
-          member_count: 1,
-          invite_code: inviteCode,
-        })
-        .select()
-        .single();
+    const { data, error } = await supabase.rpc('create_group', {
+      p_name: input.name,
+      p_emoji: input.emoji,
+      p_vibe: input.vibe,
+      p_goal_description: input.goalDescription,
+    });
 
-      if (!error) {
-        const group = mapGroupRow(data);
-        const { error: memberError } = await supabase
-          .from('group_members')
-          .insert({ group_id: group.id, user_id: userId, role: 'admin' });
-        if (memberError) throw memberError;
-
-        if (selectedTemplates && selectedTemplates.length > 0) {
-          await insertActivities(group.id, userId, selectedTemplates);
-        }
-        return group;
+    if (error) {
+      if (isRpcError(error, 'invalid_group_name') || isRpcError(error, 'invalid_vibe')) {
+        throw new AppError('VALIDATION', 'That pact could not be created. Check the details.');
       }
-
-      if (!isUniqueViolation(error)) throw error;
-      // Invite code collision — regenerate and retry
+      if (isRpcError(error, 'not_authenticated')) {
+        throw new AppError('NOT_AUTHENTICATED', 'No authenticated user');
+      }
+      console.error(`${LOG_PREFIX} createGroup RPC failed:`, error);
+      throw new AppError('NETWORK', 'Could not create pact');
     }
 
-    throw new AppError('NETWORK', 'Could not generate a unique invite code');
+    const row = firstRow<Record<string, any>>(data);
+    if (!row) {
+      throw new AppError('NETWORK', 'Could not create pact');
+    }
+
+    const group = mapGroupRow(row);
+
+    // The RPC creates the group + admin membership atomically. Activity seeds
+    // are optional bulk inserts that require the admin role granted above.
+    if (selectedTemplates && selectedTemplates.length > 0) {
+      await insertActivities(group.id, group.adminId, selectedTemplates);
+    }
+
+    return group;
   } catch (error) {
     handleServiceError('createGroup', error);
   }
 }
 
-export async function getGroupByInviteCode(code: string): Promise<Group | null> {
-  try {
-    const { data, error } = await supabase
-      .from('groups')
-      .select('*')
-      .eq('invite_code', normalizeInviteCode(code))
-      .is('deleted_at', null)
-      .maybeSingle();
-    if (error) throw error;
-    return data ? mapGroupRow(data) : null;
-  } catch (error) {
-    handleServiceError('getGroupByInviteCode', error);
-  }
-}
-
 export async function joinGroupByCode(code: string): Promise<Group> {
   try {
-    const userId = getCurrentUserId();
-    const group = await getGroupByInviteCode(code);
-    if (!group) throw new AppError('NOT_FOUND', 'Invalid invite code');
-    if (group.memberCount >= MAX_GROUP_MEMBERS) {
-      throw new AppError('GROUP_FULL', 'This pact is full');
+    getCurrentUserId();
+
+    const { data, error } = await supabase.rpc('join_group_by_code', {
+      p_code: normalizeInviteCode(code),
+    });
+
+    if (error) {
+      if (isRpcError(error, 'invalid_invite_code')) {
+        throw new AppError('NOT_FOUND', 'Invalid invite code');
+      }
+      if (isRpcError(error, 'group_full')) {
+        throw new AppError('GROUP_FULL', 'This pact is full');
+      }
+      if (isRpcError(error, 'already_member')) {
+        throw new AppError('ALREADY_MEMBER', 'You already joined this pact');
+      }
+      if (isRpcError(error, 'not_authenticated')) {
+        throw new AppError('NOT_AUTHENTICATED', 'No authenticated user');
+      }
+      console.error(`${LOG_PREFIX} joinGroupByCode RPC failed:`, error);
+      throw new AppError('NETWORK', 'Could not join pact');
     }
 
-    const { data: existing } = await supabase
-      .from('group_members')
-      .select('user_id')
-      .match({ group_id: group.id, user_id: userId })
-      .maybeSingle();
-    if (existing) throw new AppError('ALREADY_MEMBER', 'You already joined this pact');
+    const row = firstRow<Record<string, any>>(data);
+    if (!row) {
+      throw new AppError('NETWORK', 'Could not join pact');
+    }
 
-    const { error: joinError } = await supabase
-      .from('group_members')
-      .insert({ group_id: group.id, user_id: userId, role: 'member' });
-    if (joinError) throw joinError;
-
-    const { error: incrementError } = await supabase
-      .from('groups')
-      .update({ member_count: group.memberCount + 1 })
-      .eq('id', group.id);
-    if (incrementError) throw incrementError;
-
-    await createJoinNotification(userId, group);
-
-    return { ...group, memberCount: group.memberCount + 1 };
+    // The database trigger creates the admin's `new_group_member`
+    // notification, so no client write is needed here.
+    return mapGroupRow(row);
   } catch (error) {
     handleServiceError('joinGroupByCode', error);
-  }
-}
-
-async function createJoinNotification(userId: string, group: Group): Promise<void> {
-  try {
-    const username =
-      useAuthStore.getState().user?.username ||
-      useAuthStore.getState().user?.displayName ||
-      'Someone';
-
-    const { error } = await supabase.from('notifications').insert({
-      user_id: group.adminId,
-      type: 'new_group_member',
-      title: 'New member!',
-      body: `${username} joined ${group.emoji} ${group.name}`,
-      deep_link: `streakpact://group/${group.id}`,
-    });
-    if (error) console.error(`${LOG_PREFIX} createJoinNotification:`, error);
-  } catch (err) {
-    // Notifications are best-effort — never fail a join because the admin
-    // didn't get a notification.
-    console.error(`${LOG_PREFIX} createJoinNotification:`, err);
   }
 }
 
@@ -318,11 +268,7 @@ export async function leaveGroup(groupId: string): Promise<void> {
       .match({ group_id: groupId, user_id: userId });
     if (deleteError) throw deleteError;
 
-    const { error: decrementError } = await supabase
-      .from('groups')
-      .update({ member_count: Math.max(0, group.memberCount - 1) })
-      .eq('id', groupId);
-    if (decrementError) throw decrementError;
+    // `group_members_sync_count` maintains groups.member_count server-side.
   } catch (error) {
     handleServiceError('leaveGroup', error);
   }
@@ -354,16 +300,19 @@ export async function fetchGroupWithMembers(
   try {
     const { data, error } = await supabase
       .from('groups')
-      .select('*, group_members(*, user:users(*))')
+      .select(GROUP_MEMBERS_SELECT)
       .eq('id', groupId)
       .is('deleted_at', null)
       .maybeSingle();
     if (error) throw error;
     if (!data) throw new AppError('NOT_FOUND', 'Group not found');
 
-    const members = ((data.group_members ?? []) as Record<string, any>[]).map(mapMemberRow);
+    // `select()` receives a runtime-built column list, so supabase-js cannot
+    // infer its shape at the type level. The mapper validates the fields.
+    const groupRow = data as unknown as Record<string, any>;
+    const members = ((groupRow.group_members ?? []) as Record<string, any>[]).map(mapMemberRow);
     members.sort((a, b) => a.joinedAt.localeCompare(b.joinedAt));
-    return { group: mapGroupRow(data), members };
+    return { group: mapGroupRow(groupRow), members };
   } catch (error) {
     handleServiceError('fetchGroupWithMembers', error);
   }
@@ -412,19 +361,13 @@ export async function removeMember(groupId: string, userIdToRemove: string): Pro
       throw new AppError('NOT_ALLOWED', 'Use leaveGroup to remove yourself');
     }
 
-    const group = await fetchLiveGroup(groupId);
-
     const { error: deleteError } = await supabase
       .from('group_members')
       .delete()
       .match({ group_id: groupId, user_id: userIdToRemove });
     if (deleteError) throw deleteError;
 
-    const { error: decrementError } = await supabase
-      .from('groups')
-      .update({ member_count: Math.max(0, group.memberCount - 1) })
-      .eq('id', groupId);
-    if (decrementError) throw decrementError;
+    // `group_members_sync_count` maintains groups.member_count server-side.
   } catch (error) {
     handleServiceError('removeMember', error);
   }

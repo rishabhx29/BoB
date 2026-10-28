@@ -5,8 +5,7 @@ import { FieldDefinition, ActivityFrequency } from '@/types';
  * Activity templates service.
  *
  * Wraps the static `PRESET_ACTIVITIES` config in a service-shaped API
- * so the app code is identical to when these are DB-backed
- * (Phase 8+ if we want admin-managed templates).
+ * so the app code is identical to what a DB-backed catalogue would need.
  *
  * The shape of the methods mirrors what a Supabase RPC would look like.
  */

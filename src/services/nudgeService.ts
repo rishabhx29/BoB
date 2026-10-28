@@ -1,8 +1,7 @@
-import { firestore, COLLECTIONS } from './firebase';
-import { collection, addDoc, getDocs, query, where, orderBy, limit } from 'firebase/firestore';
+import { supabase } from './supabase';
 import { useAuthStore } from '@/store/useAuthStore';
 import { AppError } from './errors';
-import { supabase } from './supabase';
+import { isRpcError } from './rpc';
 
 const LOG_PREFIX = '[nudgeService]';
 const NUDGE_COOLDOWN_MS = 4 * 60 * 60 * 1000; // 4 hours
@@ -11,7 +10,7 @@ const NUDGE_COOLDOWN_MS = 4 * 60 * 60 * 1000; // 4 hours
  * Send a streak nudge to a teammate.
  * Enforces:
  *   - Current user is logged in
- *   - 4-hour cooldown per recipient
+ *   - 4-hour cooldown per recipient (persisted in the `nudges` table)
  */
 export async function sendNudge(
   recipientId: string,
@@ -27,68 +26,48 @@ export async function sendNudge(
     throw new AppError('NOT_ALLOWED', 'You cannot nudge yourself');
   }
 
-  const now = Date.now();
-  const cutoffTime = new Date(now - NUDGE_COOLDOWN_MS).toISOString();
+  const cutoff = new Date(Date.now() - NUDGE_COOLDOWN_MS).toISOString();
 
-  // 1. Check cooldown in Firestore
-  if (firestore) {
-    try {
-      const q = query(
-        collection(firestore, COLLECTIONS.nudges(recipientId)),
-        where('senderId', '==', user.id),
-        where('sentAt', '>=', cutoffTime),
-        limit(1)
+  const { data: recent, error: cooldownError } = await supabase
+    .from('nudges')
+    .select('id')
+    .eq('sender_id', user.id)
+    .eq('recipient_id', recipientId)
+    .gte('sent_at', cutoff)
+    .limit(1);
+
+  if (cooldownError) {
+    console.error(`${LOG_PREFIX} Failed to check cooldown:`, cooldownError);
+    throw new AppError('NETWORK', 'Could not check nudge cooldown');
+  }
+
+  if (recent && recent.length > 0) {
+    throw new AppError(
+      'NOT_ALLOWED',
+      'You can only nudge a teammate once every 4 hours.'
+    );
+  }
+
+  const { error: insertError } = await supabase.from('nudges').insert({
+    sender_id: user.id,
+    recipient_id: recipientId,
+    group_id: groupId,
+    activity_id: activityId ?? null,
+  });
+
+  if (insertError) {
+    if (isRpcError(insertError, 'nudge_cooldown')) {
+      throw new AppError(
+        'NOT_ALLOWED',
+        'You can only nudge a teammate once every 4 hours.'
       );
-      const snap = await getDocs(q);
-      if (!snap.empty) {
-        throw new AppError(
-          'NOT_ALLOWED',
-          'You can only nudge a teammate once every 4 hours.'
-        );
-      }
-    } catch (err) {
-      if (err instanceof AppError) throw err;
-      console.warn(`${LOG_PREFIX} Could not verify Firestore cooldown, proceeding`, err);
     }
+    console.error(`${LOG_PREFIX} Failed to persist nudge:`, insertError);
+    throw new AppError('NETWORK', 'Failed to send nudge');
   }
 
-  const nudgeRecord = {
-    senderId: user.id,
-    recipientId,
-    groupId,
-    activityId: activityId || null,
-    sentAt: new Date().toISOString(),
-    wasConverted: false,
-    senderName: user.displayName,
-    senderAvatar: user.avatarUrl,
-  };
+  // The `nudges_notify_recipient` trigger creates the in-app notification
+  // server-side, so clients cannot spoof notifications for other users.
 
-  // 2. Write to Firestore nudge queue
-  if (firestore) {
-    try {
-      await addDoc(
-        collection(firestore, COLLECTIONS.nudges(recipientId)),
-        nudgeRecord
-      );
-    } catch (err) {
-      console.warn(`${LOG_PREFIX} Failed to write nudge to Firestore:`, err);
-    }
-  }
-
-  // 3. Mirror notification into notifications table if available
-  try {
-    await supabase.from('notifications').insert({
-      user_id: recipientId,
-      type: 'nudge_received',
-      title: `${user.displayName} nudged you! ⚡`,
-      body: "Keep the momentum going — log your proof for today.",
-      deep_link: `streakpact://group/${groupId}`,
-      is_read: false,
-      created_at: new Date().toISOString(),
-    });
-  } catch (notifErr) {
-    console.warn(`${LOG_PREFIX} Failed to mirror in-app notification:`, notifErr);
-  }
-
-  return { success: true, message: `Nudged teammate!` };
+  return { success: true, message: 'Nudged teammate!' };
 }
