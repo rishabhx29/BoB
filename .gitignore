@@ -73,6 +73,11 @@ Desktop.ini
 coverage/
 .nyc_output/
 
+# Deno
+# `npx deno check` writes a root lockfile that mirrors all npm app
+# dependencies; it is not used by the Supabase deploy pipeline.
+deno.lock
+
 # User requests / Agent artifacts
 .agents/
 required/
