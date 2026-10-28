@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { storage } from '@/utils/storage';
 import ENV from './env';
 
 /**
@@ -7,7 +7,7 @@ import ENV from './env';
  *
  * - Handles relational data: users, groups, activities, submissions, streaks, badges
  * - Handles file storage: submission photos (bucket: 'submission-photos')
- * - Authentication: email/password + Google OAuth (handled by Supabase Auth, not Firebase)
+ * - Authentication: email/password + Google OAuth (handled by Supabase Auth)
  * - Row-Level Security (RLS) policies enforce data access rules server-side
  */
 
@@ -23,7 +23,9 @@ if (!supabaseUrl || !supabaseAnonKey) {
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
-    storage: AsyncStorage,
+    // Native sessions live in the iOS Keychain / Android Keystore (chunked to
+    // respect SecureStore's size limit); the web build uses AsyncStorage.
+    storage,
     autoRefreshToken: true,
     persistSession: true,
     detectSessionInUrl: false, // Mobile app — no URL-based OAuth
