@@ -8,8 +8,8 @@ import { AppError } from '@/services/errors';
  * React Query hooks for activities.
  *
  * Reads come from the `activities` table scoped to a group. Writes go
- * through `addActivity` (admin) and `archiveActivity` (admin soft-deletes).
- * `updateActivity` is added in Phase 4.1.
+ * through `addActivity` (admin) and `archiveActivity` (admin soft-deletes);
+ * `useUpdateActivity` exposes admin edits.
  */
 
 // ─── Mappers ────────────────────────────────────────────────────────────────
@@ -140,10 +140,6 @@ export function useUnarchiveActivity(groupId: string) {
 }
 
 /**
- * Update an existing activity (admin only). Added in Phase 4.1.
- * Renames, color change, rest days, frequency — anything except group_id.
- */
-/**
  * Fetch all activities across the given groups, grouped by groupId.
  * Returns a Map for O(1) lookups from the card renderer.
  */
@@ -266,6 +262,10 @@ export function useAllGroupStreaks(groupIds: string[]) {
   });
 }
 
+/**
+ * Update an existing activity (admin only).
+ * Renames, color change, rest days, frequency — anything except group_id.
+ */
 export function useUpdateActivity(groupId: string) {
   const queryClient = useQueryClient();
   return useMutation({

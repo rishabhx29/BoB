@@ -9,7 +9,6 @@ import {
   createSubmission,
   updateSubmission,
   deleteSubmission,
-  fetchGroupSubmissions,
   fetchUserSubmissions,
   fetchActivitySubmissions,
   getSubmissionById,
@@ -21,15 +20,6 @@ import {
  */
 
 // ─── Query Hooks ─────────────────────────────────────────────────────────────
-
-export function useGroupSubmissions(groupId: string, limit: number = 20) {
-  return useQuery({
-    queryKey: [...QUERY_KEYS.submissions(groupId, 'group'), limit] as const,
-    queryFn: () => fetchGroupSubmissions(groupId, limit),
-    enabled: Boolean(groupId && groupId.length > 0),
-    staleTime: STALE_TIMES.feed,
-  });
-}
 
 export function useUserSubmissions(userId: string, limit: number = 50) {
   return useQuery({
@@ -68,6 +58,8 @@ export function useCreateSubmission() {
     onSuccess: (newSubmission) => {
       // Invalidate relevant feeds and user caches
       queryClient.invalidateQueries({ queryKey: ['feed'] });
+      queryClient.invalidateQueries({ queryKey: ['today-submissions'] });
+      queryClient.invalidateQueries({ queryKey: ['my-group-members'] });
       queryClient.invalidateQueries({
         queryKey: QUERY_KEYS.submissions(newSubmission.groupId, 'group'),
       });
@@ -118,8 +110,11 @@ export function useDeleteSubmission() {
     mutationFn: (submissionId: string) => deleteSubmission(submissionId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['feed'] });
+      queryClient.invalidateQueries({ queryKey: ['today-submissions'] });
       queryClient.invalidateQueries({ queryKey: ['submissions'] });
+      queryClient.invalidateQueries({ queryKey: ['my-group-members'] });
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.currentUser });
+      queryClient.invalidateQueries({ queryKey: ['streaks'] });
     },
   });
 }
