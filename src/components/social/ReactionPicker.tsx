@@ -127,6 +127,12 @@ export function ReactionPicker({ initialCounts = {}, userReaction, onReact, onSh
   const [floatingEmojis, setFloatingEmojis] = useState<{ id: number; emoji: string }[]>([]);
   const reactionIdCounter = React.useRef(0);
 
+  // Keep the picker in sync when the server (or a rollback) changes the data.
+  React.useEffect(() => {
+    setCounts(initialCounts);
+    setActiveReaction(userReaction);
+  }, [initialCounts, userReaction]);
+
   const handleReact = (emoji: string) => {
     setCounts(prev => {
       const newCounts = { ...prev };

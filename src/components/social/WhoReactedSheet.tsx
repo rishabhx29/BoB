@@ -5,7 +5,11 @@ import { Text } from '../ui/Text';
 import { Avatar } from '../ui/Avatar';
 import { Icon } from '../ui/Icon';
 import { COLORS, SPACE, RADIUS } from '@/constants/theme';
-import { fetchSubmissionReactions, ReactionItem } from '@/services/reactionService';
+import {
+  fetchSubmissionReactions,
+  subscribeToSubmissionReactions,
+  ReactionItem,
+} from '@/services/reactionService';
 
 interface Props {
   isVisible: boolean;
@@ -18,13 +22,31 @@ export function WhoReactedSheet({ isVisible, onClose, submissionId }: Props) {
   const [reactions, setReactions] = useState<ReactionItem[]>([]);
 
   useEffect(() => {
-    if (isVisible && submissionId) {
-      setLoading(true);
-      fetchSubmissionReactions(submissionId)
-        .then((data) => setReactions(data))
-        .catch((err) => console.warn('[WhoReactedSheet] Error fetching reactions:', err))
-        .finally(() => setLoading(false));
-    }
+    if (!isVisible || !submissionId) return;
+
+    let active = true;
+    setLoading(true);
+
+    fetchSubmissionReactions(submissionId)
+      .then((data) => {
+        if (active) setReactions(data);
+      })
+      .catch((err) => console.warn('[WhoReactedSheet] Error fetching reactions:', err))
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+
+    const unsubscribe = subscribeToSubmissionReactions(submissionId, (data) => {
+      if (active) {
+        setReactions(data);
+        setLoading(false);
+      }
+    });
+
+    return () => {
+      active = false;
+      unsubscribe();
+    };
   }, [isVisible, submissionId]);
 
   return (
