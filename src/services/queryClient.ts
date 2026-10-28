@@ -59,6 +59,10 @@ export const QUERY_KEYS = {
 
   // Leaderboard
   leaderboard: (groupId: string) => ['leaderboard', groupId] as const,
+
+  // Notifications
+  notifications: (userId: string) => ['notifications', userId] as const,
+  notificationsUnread: (userId: string) => ['notifications-unread', userId] as const,
 } as const;
 
 // ─── Stale Time Config (ms) ────────────────────────────────────────────────────
@@ -69,4 +73,5 @@ export const STALE_TIMES = {
   calendar: 60 * 1000,      // 1 min
   profile: 5 * 60 * 1000,   // 5 min
   badges: 60 * 60 * 1000,   // 1 hour
+  notifications: 30 * 1000, // 30s
 } as const;
