@@ -5,16 +5,28 @@ import { User } from '@/types';
 /**
  * Auth store — single source of truth for the current user + session.
  *
- * Populated by the `useAuthSync` listener (1.5.6) that watches
- * `supabase.auth.onAuthStateChange`. Screens should NOT call `setUser`
- * directly — that's an anti-pattern that gets out of sync with the session.
+ * Populated by the `useAuthSync` listener that watches
+ * `supabase.auth.onAuthStateChange`. Screens should not call `setUser`
+ * directly except at the end of profile creation.
+ *
+ * There are two independent facts:
+ *   - `session`: the Supabase auth session. It exists as soon as someone
+ *     signs in, including a brand-new Google/OAuth user who has no app
+ *     profile yet.
+ *   - `profileStatus`: whether a `public.users` row exists for that session.
+ *
+ * The root navigator needs both: a session alone must not open Main, because
+ * every write (group membership, submissions) has a foreign key to
+ * `public.users`. A session without a profile is sent to SetupProfile.
  */
+
+export type ProfileStatus = 'unknown' | 'missing' | 'ready';
 
 interface AuthState {
   user: User | null;
   session: Session | null;
+  profileStatus: ProfileStatus;
   isLoading: boolean;
-  isAuthenticated: boolean;
 
   // Actions
   setUser: (user: User | null) => void;
@@ -26,20 +38,36 @@ interface AuthState {
 export const useAuthStore = create<AuthState>((set) => ({
   user: null,
   session: null,
+  profileStatus: 'unknown',
   isLoading: true,
-  isAuthenticated: false,
 
   setUser: (user) =>
-    set({
+    set((state) => ({
       user,
-      isAuthenticated: user !== null,
+      // A fetched profile completes onboarding; a null user with a live
+      // session means the profile row is genuinely absent.
+      profileStatus: user ? 'ready' : state.session ? 'missing' : 'unknown',
       isLoading: false,
-    }),
+    })),
 
   setSession: (session) =>
-    set({
-      session,
-      isAuthenticated: session !== null,
+    set((state) => {
+      if (!session) {
+        return {
+          session: null,
+          user: null,
+          profileStatus: 'unknown' as ProfileStatus,
+        };
+      }
+
+      // A token refresh for the same user keeps the hydrated profile. A new
+      // user id invalidates it until the listener fetches the new row.
+      const sameUser = state.session?.user?.id === session.user?.id;
+      return {
+        session,
+        user: sameUser ? state.user : null,
+        profileStatus: sameUser ? state.profileStatus : ('unknown' as ProfileStatus),
+      };
     }),
 
   setLoading: (isLoading) => set({ isLoading }),
@@ -48,7 +76,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({
       user: null,
       session: null,
-      isAuthenticated: false,
+      profileStatus: 'unknown',
       isLoading: false,
     }),
 }));
