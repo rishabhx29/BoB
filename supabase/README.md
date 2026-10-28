@@ -1,71 +1,79 @@
 # Supabase Edge Functions
 
-This directory contains the Supabase Edge Functions for StreakPact, deployed
-to your Supabase project as Deno functions on the edge runtime.
+Deno functions deployed to the Supabase edge runtime. All business logic that
+must not trust the client lives here or in a database RPC.
 
 ## Structure
 
 ```
 supabase/
-├── config.toml                # Project config (used by `supabase` CLI)
-├── functions/
-│   ├── _shared/               # Code shared across functions
-│   │   ├── cors.ts            # CORS headers
-│   │   ├── response.ts        # JSON response helpers
-│   │   ├── supabase-client.ts # Service-role + user-context clients
-│   │   └── verify-jwt.ts      # JWT verification middleware
-│   ├── hello/                 # Placeholder — deploys & responds
-│   └── ...                     # (more added per phase)
+├── config.toml
+└── functions/
+    ├── _shared/               # CORS, responses, clients, gamification
+    ├── award-xp/              # service role, idempotent XP
+    ├── evaluate-badges/       # user JWT (self) or service role (batch)
+    ├── evaluate-streaks/      # service role, daily cron
+    ├── send-push/             # service role, Expo push + preferences
+    ├── weekly-wrapup/         # service role, Sunday cron
+    ├── seed-dev/              # optional, x-seed-secret gated
+    └── hello/                 # public deployment check
+```
+
+## Auth model
+
+| Function | Required caller |
+|---|---|
+| `award-xp` | `Authorization: Bearer <service-role-key>` |
+| `evaluate-streaks` | service role |
+| `send-push` | service role |
+| `weekly-wrapup` | service role |
+| `evaluate-badges` | user JWT (self) or service role (batch) |
+| `seed-dev` | `x-seed-secret: <SEED_DEV_SECRET>` |
+| `hello` | none |
+
+The service-role checks compare the header to `SUPABASE_SERVICE_ROLE_KEY`
+exactly. pg_cron sends that header through `public.invoke_edge_function()`.
+
+## Deploy
+
+```powershell
+supabase login
+supabase link --project-ref <project-ref>
+
+supabase functions deploy hello --no-verify-jwt
+supabase functions deploy award-xp
+supabase functions deploy evaluate-badges
+supabase functions deploy evaluate-streaks
+supabase functions deploy send-push
+supabase functions deploy weekly-wrapup
+
+# Optional demo seed — never deploy without a secret.
+supabase functions deploy seed-dev --no-verify-jwt
+supabase secrets set SEED_DEV_SECRET=<long-random-value>
 ```
 
 ## Local development
 
-Requires the [Supabase CLI](https://supabase.com/docs/guides/cli).
-
 ```bash
-# Start the local stack
 supabase start
-
-# Serve a function locally
-supabase functions serve hello --no-verify-jwt
-
-# In another terminal, test it
-curl http://localhost:54321/functions/v1/hello
+supabase functions serve evaluate-badges --env-file .env.local
 ```
 
-## Deploy to production
+Cron scheduled functions can be invoked locally with a normal POST and the
+service-role key from `supabase status`.
 
-```bash
-# Deploy a single function
-supabase functions deploy hello
+## Environment
 
-# Deploy all functions
-supabase functions deploy
-```
+Supabase injects `SUPABASE_URL`, `SUPABASE_ANON_KEY` and
+`SUPABASE_SERVICE_ROLE_KEY`. `seed-dev` additionally reads `SEED_DEV_SECRET`.
+Cron credentials (`project_url`, `service_role_key`) live in Vault, with
+`app.settings.*` fallbacks — see `docs/sql/0003_gamification.sql`.
 
-## Environment variables
+## Adding a function
 
-Functions in production have these env vars set automatically by Supabase:
-- `SUPABASE_URL`
-- `SUPABASE_ANON_KEY`
-- `SUPABASE_SERVICE_ROLE_KEY`
-
-For local dev, these come from `supabase start`.
-
-## Roadmap
-
-| Function | Phase | Purpose |
-|---|---|---|
-| `hello` | 1.5 | Health check (deploy verification) |
-| `award-xp` | 5 | Calculate + award XP for a new submission |
-| `calculate-streaks` | 6 | Daily cron — recalculate streak counters |
-| `evaluate-badges` | 8 | Award badges based on stats after submission |
-| `send-push` | 9 | Wrap FCM sends for notification types |
-| `weekly-wrapup` | 8 | Generate the Sunday 7 PM weekly recap card |
-
-## Adding a new function
-
-1. Create `supabase/functions/<name>/index.ts`
-2. Import from `_shared/`: `handleCors`, `jsonResponse`, `errorResponse`, `verifyUser`
-3. Local test: `supabase functions serve <name>`
-4. Deploy: `supabase functions deploy <name>`
+1. Create `supabase/functions/<name>/index.ts`.
+2. Import CORS/response helpers and the service or user client from
+   `_shared/`.
+3. Decide the auth model first: service role, user JWT or an explicit secret.
+4. `npx -y deno check supabase/functions/<name>/index.ts`.
+5. Deploy and update this table plus `README.md`.

@@ -1,93 +1,191 @@
-# StreakPact — Dev Setup (one-shot)
+# StreakPact — one-shot setup
 
-Run these in order. Everything you need is in this file — no docs to read.
+Everything needed to take a fresh checkout to a working app. Commands are
+PowerShell; the SQL is copy-paste friendly.
 
-## 1. Install the Supabase CLI
+## 1. Requirements
+
+- Node 20+ and npm
+- A Supabase project (free tier is enough)
+- Optional: Supabase CLI for deploying edge functions
 
 ```powershell
-# Windows (PowerShell, run as admin)
-scoop install supabase
-# OR
-npm install -g supabase
+npm install
 ```
 
-## 2. Link the project to your Supabase account
+## 2. Environment
 
-```bash
-# Login (opens browser, OAuth)
+```powershell
+Copy-Item .env.example .env
+```
+
+Fill in `.env`:
+
+```dotenv
+EXPO_PUBLIC_SUPABASE_URL=https://<project-ref>.supabase.co
+EXPO_PUBLIC_SUPABASE_ANON_KEY=<anon-key>
+EXPO_PUBLIC_SUPABASE_PROJECT_REF=<project-ref>
+```
+
+Google sign-in is optional; see `.env.example` for the three client ids. Leave
+them blank to hide nothing — the Login screen will explain that Google is not
+configured if tapped.
+
+## 3. Database
+
+In the Supabase dashboard go to **SQL Editor** and run these files **in order**
+(copy the whole file, one at a time):
+
+1. `docs/sql/schema.sql`
+2. `docs/sql/0001_phase_1_5_fixes.sql`
+3. `docs/sql/0002_social.sql`
+4. `docs/sql/0003_gamification.sql`
+5. `docs/sql/0004_notifications_profile.sql`
+6. `docs/sql/0005_security.sql`
+7. `docs/sql/0006_push_tokens.sql`
+
+All migrations are idempotent, but `0005` assumes `0001`–`0004` exist. If you
+have `psql`:
+
+```powershell
+$env:PGPASSWORD = '<database-password>'
+psql "postgresql://postgres@db.<project-ref>.supabase.co:5432/postgres" `
+  -f docs/sql/schema.sql `
+  -f docs/sql/0001_phase_1_5_fixes.sql `
+  -f docs/sql/0002_social.sql `
+  -f docs/sql/0003_gamification.sql `
+  -f docs/sql/0004_notifications_profile.sql `
+  -f docs/sql/0005_security.sql `
+  -f docs/sql/0006_push_tokens.sql
+```
+
+Verify: 13 tables (`users`, `groups`, `group_members`, `activities`,
+`submissions`, `streaks`, `badges`, `user_badges`, `notifications`, `reactions`,
+`comments`, `nudges`, `xp_events`), two storage buckets (`avatars`,
+`submission-photos`) and the cron jobs from `0003`.
+
+## 4. Edge functions
+
+```powershell
 supabase login
-
-# Link to the project. Use the ref from your .env: jvnzbnoljomuxzokwogo
-supabase link --project-ref jvnzbnoljomuxzokwogo
+supabase link --project-ref <project-ref>
+supabase functions deploy hello --no-verify-jwt
+supabase functions deploy award-xp
+supabase functions deploy evaluate-badges
+supabase functions deploy evaluate-streaks
+supabase functions deploy send-push
+supabase functions deploy weekly-wrapup
 ```
 
-When prompted for the database password, paste the one you set when creating the project.
+Optional demo seed (do not deploy this to production):
 
-## 3. Apply the database schema
-
-This pushes both SQL files to your Supabase project in order.
-
-```bash
-supabase db push --db-url "$(grep SUPABASE_DB_URL .env || echo ask)"
+```powershell
+supabase functions deploy seed-dev --no-verify-jwt
+supabase secrets set SEED_DEV_SECRET=<long-random-value>
 ```
 
-If `--db-url` is rejected, use the manual route instead — see step 3b below.
+`seed-dev` returns 403 unless the request carries
+`x-seed-secret: <long-random-value>`. The other functions verify the caller
+themselves (service role for `award-xp`, `evaluate-streaks`, `send-push`,
+`weekly-wrapup`; user JWT or service role for `evaluate-badges`).
 
-### 3b. Manual SQL route (if CLI push fails)
+## 5. Cron secrets
 
-1. Open https://app.supabase.com → your project → SQL Editor → "New query"
-2. Open `docs/sql/schema.sql`, copy-paste, click **Run**
-3. Open `docs/sql/0001_phase_1_5_fixes.sql`, copy-paste, click **Run**
-4. Verify: in the Table Editor, you should see 8 tables (users, groups, group_members, activities, submissions, streaks, badges, user_badges, notifications) + 2 storage buckets
+`0003_gamification.sql` creates `invoke_edge_function()` and schedules:
 
-## 4. Deploy edge functions
+- `evaluate-streaks-daily` — 00:05 UTC
+- `weekly-wrapup-sunday` — Sunday 19:00 UTC
 
-```bash
-supabase functions deploy hello
-supabase functions deploy seed-dev
+The helper reads credentials from Vault, then from database settings. Set one
+pair in the SQL editor:
+
+```sql
+SELECT vault.create_secret('https://<project-ref>.supabase.co', 'project_url');
+SELECT vault.create_secret('<service-role-key>', 'service_role_key');
 ```
 
-## 5. Run the dev seed
+Or, without Vault:
 
-This creates 3 test users + 1 populated group. Idempotent — safe to re-run.
-
-```bash
-supabase functions invoke seed-dev --no-verify-jwt
+```sql
+ALTER DATABASE postgres SET app.settings.supabase_url = 'https://<project-ref>.supabase.co';
+ALTER DATABASE postgres SET app.settings.service_role_key = '<service-role-key>';
 ```
 
-Expected output:
+Check the schedules:
 
-```json
-{
-  "ok": true,
-  "message": "Dev seed applied.",
-  "users": { "alex@streakpact.app": "uuid-here", "...": "..." },
-  "groupId": "uuid-here",
-  "defaultPassword": "streakdev123",
-  "hint": "Sign in with alex@streakpact.app / streakdev123"
-}
+```sql
+SELECT jobid, jobname, schedule, active FROM cron.job;
 ```
 
-## 6. Smoke test
+Both functions now return 403 unless called with
+`Authorization: Bearer <service-role-key>`, which is what
+`invoke_edge_function()` sends.
 
-```bash
-# Boot the app
-cd C:\Rishabh\BoB
-npx expo start
+## 6. Run
+
+```powershell
+npm start          # Expo dev server
+npm run web        # browser preview
+npm run android    # emulator/device
+npm run ios
 ```
 
-Then in the app:
-1. On the login screen, enter `alex@streakpact.app` / `streakdev123`
-2. You should land on the Groups tab, see "Morning Hustle" with 2 members + 2 activities + 5 days of submissions
-3. Tap the group → you should see Alex + Sarah, gym/read activity cards, with streak counters
+First run goes Onboarding → Login/Register. Registering (or a first Google
+sign-in) lands on the profile step; the app enters Main as soon as the
+`public.users` row exists. The demo shortcut on Login is `__DEV__`-only.
 
-## If something breaks
+## 7. Optional demo seed
 
-- **`function deploy` says "service_role not set"** → that's a CLI config thing; check `supabase/.temp/*` after `supabase link`
-- **Seed says "permission denied"** → your account doesn't have admin on the project; double-check the project ref
-- **App login fails with "Invalid API key"** → restart Metro (`Ctrl+C` then `npx expo start -c`); env vars hot-reload but cached sometimes
-- **You see the user but the group is empty** → the seed inserted the group but the user_id on members is wrong; check the function's output for the userIds vs. group_members.user_id match
+With `SEED_DEV_SECRET` set:
 
-## That's the whole setup
+```powershell
+Invoke-RestMethod -Method Post `
+  -Uri "https://<project-ref>.supabase.co/functions/v1/seed-dev" `
+  -Headers @{ 'x-seed-secret' = '<long-random-value>' }
+```
 
-After step 6, you're at "Phase 1.5 verified end-to-end". Tell me and I'll continue to Phase 2.
+This creates `alex@streakpact.app`, `sarah@streakpact.app` and
+`mike@streakpact.app` (password `streakdev123`), the "Morning Hustle" pact and
+a week of proofs.
+
+## 8. Smoke test
+
+1. Register a user → complete profile → land on Home with an empty state.
+2. Create a pact, add an activity, invite a second account by code → member
+   count becomes 2 and the invitee sees the pact.
+3. Submit proof (photo and/or fields) → success card, XP increases, feed shows
+   the proof with a streak chip.
+4. React and comment from a second account → author sees counts update live and
+   a notification appears; the Home bell increments without a refresh.
+5. Declare a rest day → streak survives the missed day. Consume a shield →
+   count drops and a second use in seven days is rejected.
+6. Enable airplane mode, submit proof → sync pill shows queued; reconnect →
+   proof uploads once and the queue clears.
+7. Open a notification → deep link lands on the submission/pact/badges screen.
+8. Settings → edit profile, toggle a push category, sign out and back in.
+9. On a device build (`extra.eas.projectId` configured): grant notification
+   permission → `users.fcm_token` holds an `ExpoPushToken[…]`; tapping a pushed
+   `data.link` opens the routed screen; signing out clears the token.
+
+## 9. Checks
+
+```powershell
+npm run typecheck
+npm run export:web
+npx -y deno check supabase/functions/*/index.ts
+```
+
+## Troubleshooting
+
+| Symptom | Fix |
+|---|---|
+| `permission denied for table users` | A query is selecting private columns. Use `PUBLIC_USER_COLUMNS` or `get_my_profile()`. |
+| `function ... does not exist` | Migrations were applied out of order; run `0001`–`0005`. |
+| Cron functions return 401/403 | Set both `project_url` and `service_role_key`; redeploy the functions. |
+| `seed_dev_disabled` | Set `SEED_DEV_SECRET` and send `x-seed-secret`. |
+| Login says “JWT issued at future” | Device clock is ahead of Supabase. Fix the device clock and sign in again. |
+| Push never arrives | Pushed tickets are only sent by `send-push` callers; check the user granted permission, `extra.eas.projectId` is set and APNs/FCM credentials are uploaded. `users.fcm_token` should hold an `ExpoPushToken[…]`. |
+| Feed is empty for a new account | Join or create a pact first; the feed is scoped to your groups. |
+
+The current Supabase project referenced by the original `.env` is unreachable
+from this environment, so the live deployment steps above are still pending.
