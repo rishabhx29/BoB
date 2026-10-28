@@ -11,6 +11,7 @@
     "@expo/vector-icons": "^15.0.2",
     "@hookform/resolvers": "^5.9.1",
     "@react-native-async-storage/async-storage": "2.2.0",
+    "@react-native-community/netinfo": "12.0.1",
     "@react-navigation/bottom-tabs": "^7.18.17",
     "@react-navigation/native": "^7.3.17",
     "@react-navigation/native-stack": "^7.18.9",
@@ -28,13 +29,12 @@
     "expo-image-manipulator": "~57.0.14",
     "expo-image-picker": "~57.0.14",
     "expo-linking": "~57.0.8",
-    "expo-local-authentication": "~57.0.2",
+    "expo-notifications": "^58.1.6",
     "expo-secure-store": "~57.0.1",
     "expo-splash-screen": "~57.0.8",
     "expo-status-bar": "~57.0.1",
     "expo-symbols": "~57.0.2",
     "expo-web-browser": "~57.0.2",
-    "firebase": "^12.18.0",
     "nativewind": "^4.2.6",
     "phosphor-react-native": "^3.0.6",
     "react": "19.2.3",
@@ -61,7 +61,9 @@
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "typecheck": "tsc --noEmit",
+    "export:web": "expo export --platform web"
   },
   "private": true
 }
