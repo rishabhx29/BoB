@@ -62,9 +62,8 @@ CREATE POLICY "Users can only update themselves" ON public.users
 CREATE POLICY "Users can insert themselves" ON public.users
   FOR INSERT WITH CHECK (id = auth.uid()::text);
 
--- Note: the cast `auth.uid()::text` is needed because Supabase's `users.id`
--- is TEXT (we kept it TEXT for forward compat with the legacy Firebase UID
--- column that was in the old code). The UUID is just stringified.
+-- Note: the cast `auth.uid()::text` is needed because `users.id` is TEXT and
+-- Supabase Auth exposes the user id as UUID. The UUID is just stringified.
 
 -- 5. notifications table
 -- ─────────────────────────────────────────────────────────────────────────────

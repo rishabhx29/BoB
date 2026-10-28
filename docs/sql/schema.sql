@@ -1,6 +1,10 @@
 -- StreakPact — Supabase PostgreSQL Schema
 -- Run this in: Supabase Dashboard → SQL Editor → New Query
--- 
+--
+-- After this file, run `0001_phase_1_5_fixes.sql`, `0002_social.sql`,
+-- `0003_gamification.sql`, `0004_notifications_profile.sql` and
+-- `0005_security.sql` in order (additive, idempotent migrations).
+--
 -- Tables: users, groups, group_members, activities, submissions, streaks, badges, user_badges
 -- Includes: RLS policies, indexes, pg_cron jobs for streak calculation
 
@@ -12,7 +16,7 @@ CREATE EXTENSION IF NOT EXISTS "pg_cron";
 -- ─── USERS ────────────────────────────────────────────────────────────────────
 
 CREATE TABLE public.users (
-  id                 TEXT PRIMARY KEY,             -- Firebase UID
+  id                 TEXT PRIMARY KEY,             -- Supabase auth UUID (stringified)
   email              TEXT NOT NULL UNIQUE,
   username           TEXT NOT NULL UNIQUE,
   display_name       TEXT NOT NULL DEFAULT '',
@@ -299,22 +303,9 @@ CREATE POLICY "User badges readable by group members" ON public.user_badges
   FOR SELECT USING (TRUE);
 
 -- ─── STREAK CALCULATION CRON JOB (pg_cron) ───────────────────────────────────
--- Runs daily at 00:05 UTC — checks all active streaks and updates accordingly
--- NOTE: Enable pg_cron in Supabase Dashboard → Extensions before running this
-
-/*
-SELECT cron.schedule(
-  'streak-check-daily',
-  '5 0 * * *',
-  $$
-    SELECT net.http_post(
-      url := current_setting('app.supabase_url') || '/functions/v1/calculate-streaks',
-      headers := jsonb_build_object(
-        'Content-Type', 'application/json',
-        'Authorization', 'Bearer ' || current_setting('app.service_role_key')
-      ),
-      body := '{}'::jsonb
-    );
-  $$
-);
-*/
+-- Scheduled in `docs/sql/0003_gamification.sql`:
+--   evaluate-streaks-daily  → 00:05 UTC
+--   weekly-wrapup-sunday    → Sunday 19:00 UTC
+-- Those jobs call the Edge Functions through `public.invoke_edge_function()`.
+-- Credentials are read from Vault (`project_url`, `service_role_key`) or from
+-- the `app.settings.*` database settings. See 0003 for setup.
