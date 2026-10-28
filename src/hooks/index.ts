@@ -20,6 +20,10 @@ export * from './useSubmissions';
 // useFeedSubmissions is also re-exported by useSubmissions above
 export * from './useStreaks';
 export * from './useBadges';
+export * from './useFeed';
+export * from './useHomeData';
+export * from './useOfflineSync';
+export * from './useNotifications';
 
 // useGroups last because it re-exports useGroupActivities (handled above).
 export * from './useGroups';
