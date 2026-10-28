@@ -1,17 +1,17 @@
 import React, { useState, useRef, useCallback, useMemo } from 'react';
 import { View, StyleSheet, ScrollView, Pressable, RefreshControl, Share, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Text, Button, Avatar, Card, Badge, Icon, IconName, BottomSheet, Input, StreakSummaryBar, CalendarGrid, VoltPeek, FeedCard } from '@/components/ui';
+import { Text, Button, Avatar, Card, Badge, Icon, IconName, BottomSheet, Input, StreakSummaryBar, CalendarGrid, VoltPeek } from '@/components/ui';
+import { FeedCard } from '@/components/ui/FeedCard';
 import { COLORS, RADIUS, SHADOWS, SPACE } from '@/constants/theme';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { ActivityCard, MemberActivityStatus } from '@/components/groups/ActivityCard';
-import { GroupMember } from '@/types';
+import { GroupMember, FeedItem } from '@/types';
 import * as Haptics from 'expo-haptics';
 import * as Clipboard from 'expo-clipboard';
 import { useGroup, useGroupActivities, useGroupStreak, useGroupMonthlyCalendar, useGroupStreakMembers } from '@/hooks';
-import { useGroupSubmissions } from '@/hooks/useSubmissions';
+import { useGroupFeed } from '@/hooks/useFeed';
 import { resolveGroupIcon } from '@/utils/groupVisuals';
-import { submissionToFeedCard } from '@/utils/feedAdapters';
 import { sendNudge } from '@/services/nudgeService';
 import { useAuthStore } from '@/store/useAuthStore';
 import { WeeklyWrapCard } from '@/components/social/WeeklyWrapCard';
@@ -37,7 +37,8 @@ export default function GroupHomeScreen() {
 
   const { data: groupData, isLoading, refetch } = useGroup(groupId);
   const { data: activities = [] } = useGroupActivities(groupId);
-  const { data: submissions = [] } = useGroupSubmissions(groupId, 20);
+  const { data: feedPage, refetch: refetchFeed } = useGroupFeed(groupId, 20);
+  const submissions = feedPage?.items ?? [];
   const { data: groupStreak = 0 } = useGroupStreak(groupId);
 
   const group = groupData?.group;
@@ -61,7 +62,7 @@ export default function GroupHomeScreen() {
 
   const onRefresh = async () => {
     setRefreshing(true);
-    try { await refetch(); } finally { setRefreshing(false); }
+    try { await Promise.all([refetch(), refetchFeed()]); } finally { setRefreshing(false); }
   };
 
   const handleShare = async () => {
@@ -384,10 +385,9 @@ function FeedTab({
 }: {
   group: any;
   members: any[];
-  submissions: any[];
+  submissions: FeedItem[];
   onInvite: () => void;
 }) {
-  const groupNameById = useMemo(() => ({ [group.id]: group.name }), [group.id, group.name]);
   return (
     <View style={styles.tabContent}>
       <Card variant="outline" padding="lg" style={styles.inviteCard}>
@@ -420,18 +420,11 @@ function FeedTab({
           </Text>
         </Card>
       ) : (
-        submissions.slice(0, 10).map((s: any) => {
-          const view = submissionToFeedCard(s, groupNameById);
-          return (
-            <View key={s.id} style={styles.feedItem}>
-              <FeedCard
-                user={view.user}
-                activity={view.activity}
-                submission={view.submission}
-              />
-            </View>
-          );
-        })
+        submissions.slice(0, 10).map((item: FeedItem) => (
+          <View key={item.id} style={styles.feedItem}>
+            <FeedCard item={item} />
+          </View>
+        ))
       )}
     </View>
   );
@@ -456,8 +449,8 @@ function ActivitiesTab({
         const memberStatuses: MemberActivityStatus[] = members.map((m: any) => ({
           member: m,
           // We don't have streak counts here without a useUserStreaks call.
-          // Phase 6 wires the per-user streak; for now show 0 — the dot
-          // color is what matters most on the activity card.
+          // Per-activity member streaks are not part of this query; the dot
+          // color (submitted today or not) is what the card prioritizes.
           currentStreak: 0,
           hasSubmittedToday: submissionStatusByMemberActivity
             .get(m.userId)
@@ -469,7 +462,12 @@ function ActivitiesTab({
             activity={activity}
             memberStatuses={memberStatuses}
             onPress={() => navigation.navigate('ActivityDetail', { groupId: group.id, activityId: activity.id })}
-            onSubmit={() => Alert.alert('Submit', `Open submission flow for ${activity.name}`)}
+            onSubmit={() =>
+              navigation.navigate('SubmissionFlow', {
+                activityId: activity.id,
+                groupId: group.id,
+              })
+            }
           />
         );
       })}

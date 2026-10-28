@@ -7,6 +7,7 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import { z } from 'zod';
 import { useJoinGroup } from '@/hooks/useGroups';
 import { isAppError } from '@/services/errors';
+import { clearPendingInvite } from '@/navigation/pendingInvite';
 
 const CODE_LENGTH = 6;
 const joinSchema = z.string().length(CODE_LENGTH).regex(/^[A-HJ-NP-Z2-9]+$/, "Invalid characters. Use A-Z, 2-9 (no 0, 1, I, O)");
@@ -20,6 +21,12 @@ export default function JoinGroupScreen() {
   const [isScanning, setIsScanning] = useState(false);
   const [permission, requestPermission] = useCameraPermissions();
   const inputRef = useRef<TextInput>(null);
+
+  // The screen is the destination of the invite hand-off, so the stored code
+  // has served its purpose as soon as the modal is visible.
+  useEffect(() => {
+    void clearPendingInvite();
+  }, []);
 
   const handleJoin = async (codeToJoin = code) => {
     if (joinGroup.isPending) return;

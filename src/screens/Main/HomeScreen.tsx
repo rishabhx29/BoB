@@ -1,44 +1,136 @@
-import React, { useState } from 'react';
-import { View, FlatList, StyleSheet, SafeAreaView, Pressable, RefreshControl, ScrollView } from 'react-native';
-import { Text, Icon, Avatar, Badge, Button } from '@/components/ui';
+import React, { useCallback, useMemo, useState } from 'react';
+import {
+  ActivityIndicator,
+  FlatList,
+  Pressable,
+  RefreshControl,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  View,
+} from 'react-native';
+import { Text, Icon, Avatar, Button } from '@/components/ui';
 import { COLORS, RADIUS, SPACE } from '@/constants/theme';
 import { useAuthStore } from '@/store/useAuthStore';
-import { useMockFeed, MockFeedItem } from '@/hooks/useMockFeed';
-import { useUserGroups } from '@/hooks';
+import { useUserGroups, useUnreadNotificationCount } from '@/hooks';
+import { useFeed } from '@/hooks/useFeed';
+import { useHomeData } from '@/hooks/useHomeData';
 import { FeedCard } from '@/components/ui/FeedCard';
 import { TodayBanner } from '@/components/ui/TodayBanner';
 import { useNavigation } from '@react-navigation/native';
+import { FeedItem } from '@/types';
 
 export default function HomeScreen() {
   const navigation = useNavigation<any>();
   const { user } = useAuthStore();
   const [feedFilter, setFeedFilter] = useState<'all' | 'mine'>('all');
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
-  const { data: userGroups = [] } = useUserGroups();
-  
-  // Use our new mock hook for Phase 7 UI build-out
-  const { data: allSubmissions, isLoading: feedLoading, refetch } = useMockFeed();
+  const unread = useUnreadNotificationCount(user?.id ?? '');
 
-  const topSubmissions = React.useMemo(() => {
-    let list = allSubmissions;
-    if (feedFilter === 'mine' && user?.id) {
-      list = list.filter(s => s.userId === user.id);
-    }
-    if (selectedGroupId) {
-      list = list.filter(s => s.groupId === selectedGroupId);
-    }
-    return list;
-  }, [allSubmissions, feedFilter, selectedGroupId, user?.id]);
+  const { data: userGroups = [], isLoading: groupsLoading } = useUserGroups();
+  const groupIds = useMemo(() => userGroups.map((group) => group.id), [userGroups]);
 
-  const renderItem = ({ item }: { item: MockFeedItem }) => {
-    return (
-      <View style={styles.cardWrapper}>
-        <FeedCard item={item} />
-      </View>
-    );
-  };
+  // Drop a stale pact filter if the user left that pact.
+  const activeGroupId =
+    selectedGroupId && groupIds.includes(selectedGroupId) ? selectedGroupId : null;
+
+  const feed = useFeed({
+    groupIds,
+    selectedGroupId: activeGroupId,
+    userId: feedFilter === 'mine' ? user?.id : undefined,
+  });
+  const home = useHomeData(userGroups, user?.id);
+
+  const feedItems = useMemo(
+    () => feed.data?.pages.flatMap((page) => page.items) ?? [],
+    [feed.data]
+  );
+
+  const handleRefresh = useCallback(() => {
+    void Promise.all([feed.refetch(), home.refetch()]);
+  }, [feed.refetch, home.refetch]);
+
+  const handleEndReached = useCallback(() => {
+    if (feed.hasNextPage && !feed.isFetchingNextPage) {
+      void feed.fetchNextPage();
+    }
+  }, [feed.hasNextPage, feed.isFetchingNextPage, feed.fetchNextPage]);
+
+  const openPacts = useCallback(() => {
+    navigation.navigate('Main', { screen: 'Groups' });
+  }, [navigation]);
+
+  const openActivity = useCallback(
+    (activityId: string, groupId: string) => {
+      navigation.navigate('SubmissionFlow', { activityId, groupId });
+    },
+    [navigation]
+  );
+
+  const renderItem = ({ item }: { item: FeedItem }) => (
+    <View style={styles.cardWrapper}>
+      <FeedCard item={item} />
+    </View>
+  );
 
   const renderEmpty = () => {
+    if (groupsLoading || feed.isLoading) {
+      return (
+        <View style={styles.loadingState}>
+          <ActivityIndicator color={COLORS.accentBlue} size="small" />
+          <Text variant="caption" color={COLORS.textSecondary}>
+            Loading squad proofs…
+          </Text>
+        </View>
+      );
+    }
+
+    if (feed.isError) {
+      return (
+        <View style={styles.empty}>
+          <View style={styles.emptyIconCircle}>
+            <Icon name="warning-circle" size={24} color={COLORS.warning} />
+          </View>
+          <Text variant="headingSm" color={COLORS.textPrimary} style={styles.emptyTitle}>
+            Couldn't Load Proofs
+          </Text>
+          <Text variant="bodySm" color={COLORS.textSecondary} style={styles.emptySub}>
+            Check your connection and try again.
+          </Text>
+          <View style={{ height: 18 }} />
+          <Button
+            label="Retry"
+            variant="pill"
+            leadingIcon="arrows-clockwise"
+            onPress={() => void feed.refetch()}
+          />
+        </View>
+      );
+    }
+
+    if (userGroups.length === 0) {
+      return (
+        <View style={styles.empty}>
+          <View style={styles.emptyIconCircle}>
+            <Icon name="users" size={24} color={COLORS.accentBlue} />
+          </View>
+          <Text variant="headingSm" color={COLORS.textPrimary} style={styles.emptyTitle}>
+            Your Feed Is Waiting
+          </Text>
+          <Text variant="bodySm" color={COLORS.textSecondary} style={styles.emptySub}>
+            Create or join a pact to start collecting proofs together.
+          </Text>
+          <View style={{ height: 18 }} />
+          <Button
+            label="Find Your Pact"
+            variant="pill"
+            leadingIcon="users"
+            onPress={openPacts}
+          />
+        </View>
+      );
+    }
+
     return (
       <View style={styles.empty}>
         <View style={styles.emptyIconCircle}>
@@ -55,34 +147,59 @@ export default function HomeScreen() {
           label="Explore Pacts"
           variant="pill"
           leadingIcon="users"
-          onPress={() => navigation.navigate('Main', { screen: 'Groups' })}
+          onPress={openPacts}
         />
       </View>
     );
   };
 
+  const renderFooter = () => {
+    if (feed.isFetchingNextPage) {
+      return (
+        <View style={styles.footer}>
+          <ActivityIndicator color={COLORS.accentBlue} size="small" />
+        </View>
+      );
+    }
+    if (feed.isError && feedItems.length > 0) {
+      return (
+        <View style={styles.footer}>
+          <Text variant="caption" color={COLORS.textTertiary}>
+            Couldn't load more proofs. Pull down to retry.
+          </Text>
+        </View>
+      );
+    }
+    return null;
+  };
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <FlatList
-        data={topSubmissions}
+        data={feedItems}
         keyExtractor={(item) => item.id}
         ListHeaderComponent={
           <>
             <HomeHeader
-              name={user?.displayName || 'Mark'}
+              name={user?.displayName || 'there'}
               avatarUrl={user?.avatarUrl}
               pactsCount={userGroups.length}
-              feedFilter={feedFilter}
-              setFeedFilter={setFeedFilter}
+              streakDays={home.streakDays}
+              doneToday={home.doneToday}
+              unreadCount={unread.data ?? 0}
+              onPressNotifications={() => navigation.navigate('Notifications')}
             />
-            <TodayBanner />
+            <TodayBanner
+              items={home.todayItems}
+              isLoading={home.isLoading}
+              isError={home.isError}
+              onPressActivity={openActivity}
+              onExplorePacts={openPacts}
+            />
             <View style={styles.feedHeaderRow}>
-              <View style={styles.feedTitleBlock}>
-                <Text variant="headingSm" color={COLORS.textPrimary}>
-                  Squad Proofs
-                </Text>
-                <Badge label="LIVE" variant="live" size="sm" pulse />
-              </View>
+              <Text variant="headingSm" color={COLORS.textPrimary}>
+                Squad Proofs
+              </Text>
               <View style={styles.filterPills}>
                 <Pressable
                   onPress={() => setFeedFilter('all')}
@@ -90,6 +207,8 @@ export default function HomeScreen() {
                     styles.filterPill,
                     feedFilter === 'all' ? styles.filterPillActive : styles.filterPillInactive,
                   ]}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: feedFilter === 'all' }}
                 >
                   <Text
                     variant="caption"
@@ -104,6 +223,8 @@ export default function HomeScreen() {
                     styles.filterPill,
                     feedFilter === 'mine' ? styles.filterPillActive : styles.filterPillInactive,
                   ]}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: feedFilter === 'mine' }}
                 >
                   <Text
                     variant="caption"
@@ -126,21 +247,23 @@ export default function HomeScreen() {
                   onPress={() => setSelectedGroupId(null)}
                   style={[
                     styles.groupFilterChip,
-                    selectedGroupId === null
+                    activeGroupId === null
                       ? styles.groupFilterChipActive
                       : styles.groupFilterChipInactive,
                   ]}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: activeGroupId === null }}
                 >
                   <Text
                     variant="caption"
-                    color={selectedGroupId === null ? '#FFFFFF' : COLORS.textSecondary}
+                    color={activeGroupId === null ? '#FFFFFF' : COLORS.textSecondary}
                     style={styles.groupFilterText}
                   >
                     ✨ All Squads
                   </Text>
                 </Pressable>
                 {userGroups.map((group) => {
-                  const isSelected = selectedGroupId === group.id;
+                  const isSelected = activeGroupId === group.id;
                   return (
                     <Pressable
                       key={group.id}
@@ -151,6 +274,8 @@ export default function HomeScreen() {
                           ? styles.groupFilterChipActive
                           : styles.groupFilterChipInactive,
                       ]}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: isSelected }}
                     >
                       <Text
                         variant="caption"
@@ -167,14 +292,18 @@ export default function HomeScreen() {
           </>
         }
         renderItem={renderItem}
-        ListEmptyComponent={!feedLoading ? renderEmpty : null}
+        ListEmptyComponent={renderEmpty()}
+        ListFooterComponent={renderFooter()}
+        onEndReached={handleEndReached}
+        onEndReachedThreshold={0.4}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl 
-            refreshing={feedLoading} 
-            onRefresh={refetch}
+          <RefreshControl
+            refreshing={feed.isRefetching || home.isRefetching}
+            onRefresh={handleRefresh}
             tintColor={COLORS.accentBlue}
+            colors={[COLORS.accentBlue]}
           />
         }
       />
@@ -186,14 +315,18 @@ function HomeHeader({
   name,
   avatarUrl,
   pactsCount,
-  feedFilter,
-  setFeedFilter,
+  streakDays,
+  doneToday,
+  unreadCount,
+  onPressNotifications,
 }: {
   name: string;
   avatarUrl?: string | null;
   pactsCount: number;
-  feedFilter: 'all' | 'mine';
-  setFeedFilter: (f: 'all' | 'mine') => void;
+  streakDays: number;
+  doneToday: number;
+  unreadCount: number;
+  onPressNotifications: () => void;
 }) {
   const firstName = name.split(' ')[0] || 'there';
 
@@ -209,7 +342,27 @@ function HomeHeader({
             Hey, {firstName}
           </Text>
         </View>
-        <Avatar name={name} size={48} url={avatarUrl ?? null} />
+        <View style={styles.headerActions}>
+          <Pressable
+            onPress={onPressNotifications}
+            style={({ pressed }) => [styles.bellButton, pressed ? styles.bellButtonPressed : null]}
+            hitSlop={6}
+            accessibilityRole="button"
+            accessibilityLabel={
+              unreadCount > 0 ? `Notifications, ${unreadCount} unread` : 'Notifications'
+            }
+          >
+            <Icon name="bell" size={20} color={COLORS.textPrimary} />
+            {unreadCount > 0 ? (
+              <View style={styles.bellBadge}>
+                <Text variant="caption" color="#FFFFFF" style={styles.bellBadgeText}>
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </Text>
+              </View>
+            ) : null}
+          </Pressable>
+          <Avatar name={name} size={48} url={avatarUrl ?? null} />
+        </View>
       </View>
 
       {/* Stats Card */}
@@ -222,7 +375,7 @@ function HomeHeader({
             <Text variant="caption" color={COLORS.textSecondary}>Streak</Text>
           </View>
           <Text variant="numericMd" color={COLORS.textPrimary} style={styles.statVal}>
-            14d
+            {streakDays}d
           </Text>
         </View>
 
@@ -236,7 +389,7 @@ function HomeHeader({
             <Text variant="caption" color={COLORS.textSecondary}>Today</Text>
           </View>
           <Text variant="numericMd" color={COLORS.textPrimary} style={styles.statVal}>
-            2 done
+            {doneToday} done
           </Text>
         </View>
 
@@ -267,7 +420,7 @@ const styles = StyleSheet.create({
     paddingBottom: 120,
   },
   cardWrapper: {
-    paddingHorizontal: 16, 
+    paddingHorizontal: 16,
   },
   header: {
     paddingHorizontal: SPACE.lg,
@@ -282,6 +435,43 @@ const styles = StyleSheet.create({
   },
   greetingText: {
     flex: 1,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACE.sm,
+  },
+  bellButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: COLORS.bgPanel,
+    borderWidth: 1,
+    borderColor: COLORS.hairline,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  bellButtonPressed: {
+    backgroundColor: COLORS.bgSurface,
+  },
+  bellBadge: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    paddingHorizontal: 4,
+    backgroundColor: COLORS.accentRed,
+    borderWidth: 2,
+    borderColor: COLORS.bgBase,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  bellBadgeText: {
+    fontSize: 9,
+    lineHeight: 11,
+    fontWeight: '700',
   },
   greetingEyebrow: {
     letterSpacing: 1.2,
@@ -299,11 +489,6 @@ const styles = StyleSheet.create({
     marginTop: SPACE.xl,
     marginBottom: SPACE.md,
     paddingHorizontal: SPACE.lg,
-  },
-  feedTitleBlock: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACE.xs,
   },
   filterPills: {
     flexDirection: 'row',
@@ -347,6 +532,13 @@ const styles = StyleSheet.create({
   groupFilterText: {
     fontWeight: '600',
   },
+  loadingState: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: SPACE.sm,
+    paddingVertical: SPACE.xl,
+  },
   empty: {
     paddingHorizontal: SPACE.lg,
     marginTop: SPACE.xl,
@@ -368,6 +560,10 @@ const styles = StyleSheet.create({
   },
   emptySub: {
     textAlign: 'center',
+  },
+  footer: {
+    paddingVertical: SPACE.lg,
+    alignItems: 'center',
   },
   statsCard: {
     flexDirection: 'row',

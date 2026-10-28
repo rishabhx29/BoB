@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { RootStackParamList, Activity } from '@/types';
+import { RootStackParamList, Activity, BadgeDefinition } from '@/types';
 import { COLORS, TYPOGRAPHY, SPACE, RADIUS, SHADOWS } from '@/constants/theme';
 import { Text } from '@/components/ui/Text';
 import { Icon } from '@/components/ui/Icon';
@@ -22,7 +22,6 @@ import { Button } from '@/components/ui/Button';
 import { PreviewCard } from '@/components/ui/PreviewCard';
 import { ConfettiBurst, XPChip, VoltPeek } from '@/components/ui';
 import * as Haptics from 'expo-haptics';
-import { PRESET_ACTIVITIES } from '@/constants/activityTemplates';
 import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -32,6 +31,9 @@ import { uploadSubmissionPhoto } from '@/services/storageService';
 import { useUserGroups } from '@/hooks';
 import { useGroupActivities, useActivity } from '@/hooks/useActivities';
 import { isAppError } from '@/services/errors';
+import { useQueryClient } from '@tanstack/react-query';
+import { QUERY_KEYS } from '@/services/queryClient';
+import { evaluateMyBadges } from '@/services/badgeService';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'SubmissionFlow'>;
 type Step = 'ACTIVITY_SELECT' | 'CAMERA' | 'FORM' | 'DETAILS' | 'CONFIRM' | 'SUCCESS';
@@ -49,8 +51,11 @@ export default function SubmissionFlowScreen({ navigation, route }: Props) {
   const [description, setDescription] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [earnedXp, setEarnedXp] = useState(60);
+  const [earnedBadges, setEarnedBadges] = useState<BadgeDefinition[]>([]);
+  const [queuedOffline, setQueuedOffline] = useState(false);
 
   const { user } = useAuthStore();
+  const queryClient = useQueryClient();
   const createSubmissionMutation = useCreateSubmission();
   const { addSubmission } = useSubmissionQueue();
 
@@ -73,6 +78,7 @@ export default function SubmissionFlowScreen({ navigation, route }: Props) {
 
   const handleSelectActivity = (activity: Activity) => {
     setSelectedActivity(activity);
+    setQueuedOffline(false);
     setStep('CAMERA');
   };
 
@@ -169,29 +175,38 @@ export default function SubmissionFlowScreen({ navigation, route }: Props) {
 
       setEarnedXp(result.xpEarned || 60);
       setStep('SUCCESS');
+
+      // Badges are evaluated server-side after the proof lands. This runs in the
+      // background so a cold edge function never delays the success screen.
+      void evaluateMyBadges().then((badges) => {
+        if (badges.length === 0) return;
+        setEarnedBadges(badges);
+        if (user?.id) {
+          queryClient.invalidateQueries({ queryKey: QUERY_KEYS.userBadges(user.id) });
+        }
+      });
     } catch (err: any) {
       console.warn('[SubmissionFlow] Submission error:', err);
 
       if (isAppError(err) && err.code === 'DUPLICATE_SUBMISSION') {
         Alert.alert('Already Logged Today', err.message);
       } else {
-        // Queue for offline background sync
+        // Queue for offline background sync. Keep the uploaded photo URL (if the
+        // upload already succeeded) so a retry doesn't upload it twice.
         addSubmission({
-          id: `sub_${Date.now()}`,
+          id: `sub_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+          ownerId: user?.id,
           activityId: selectedActivity.id,
           groupId,
           timestamp: new Date().toISOString(),
           title: title.trim() || undefined,
           description: description.trim() || undefined,
           fieldsData: formData,
-          photoUri: photoUri || undefined,
+          photoUri: uploadedPhotoUrl ? undefined : photoUri || undefined,
+          uploadedPhotoUrl: uploadedPhotoUrl ?? undefined,
         });
 
-        setEarnedXp(60);
-        Alert.alert(
-          'Saved Offline',
-          'Your proof has been saved and will sync automatically once network connectivity is restored.'
-        );
+        setQueuedOffline(true);
         setStep('SUCCESS');
       }
     } finally {
@@ -266,54 +281,27 @@ export default function SubmissionFlowScreen({ navigation, route }: Props) {
                   </Pressable>
                 ))
               ) : (
-                <>
-                  <Text style={[styles.placeholderText, { marginBottom: SPACE.lg }]}>
-                    No pact activities found. Select a preset template to submit:
+                <View style={styles.emptyActivities}>
+                  <View style={styles.emptyIconCircle}>
+                    <Icon name="lightning" size={24} color={COLORS.accentBlue} />
+                  </View>
+                  <Text
+                    variant="headingSm"
+                    color={COLORS.textPrimary}
+                    style={styles.emptyTitle}
+                  >
+                    No Activities Yet
                   </Text>
-                  {PRESET_ACTIVITIES.slice(0, 4).map((preset) => {
-                    const mockAct: Activity = {
-                      id: `preset_${preset.id}`,
-                      groupId: activeGroupId || 'default-group',
-                      name: preset.name,
-                      icon: preset.icon,
-                      color: preset.color,
-                      templateKey: preset.id,
-                      frequency: 'daily',
-                      frequencyDays: [0, 1, 2, 3, 4, 5, 6],
-                      restDaysPerWeek: 1,
-                      requirePhoto: false,
-                      templateFields: preset.templateFields as any,
-                      isArchived: false,
-                      createdAt: new Date().toISOString(),
-                      updatedAt: new Date().toISOString(),
-                    };
-                    return (
-                      <Pressable
-                        key={preset.id}
-                        style={styles.activityItem}
-                        onPress={() => handleSelectActivity(mockAct)}
-                      >
-                        <View
-                          style={[
-                            styles.activityIconBox,
-                            { backgroundColor: preset.color },
-                          ]}
-                        >
-                          <Text style={styles.activityIconText}>{preset.icon}</Text>
-                        </View>
-                        <View style={{ flex: 1, marginLeft: SPACE.md }}>
-                          <Text variant="headingSm" color={COLORS.textPrimary}>
-                            {preset.name}
-                          </Text>
-                          <Text variant="caption" color={COLORS.textSecondary}>
-                            Preset template
-                          </Text>
-                        </View>
-                        <Icon name="arrow-right" size={20} color={COLORS.textTertiary} />
-                      </Pressable>
-                    );
-                  })}
-                </>
+                  <Text style={[styles.placeholderText, styles.emptySubtitle]}>
+                    This pact doesn't have any habits yet. Ask a pact admin to add one,
+                    or create your own pact with activities.
+                  </Text>
+                  <Button
+                    label="Back"
+                    variant="secondary"
+                    onPress={handleClose}
+                  />
+                </View>
               )}
             </ScrollView>
           </View>
@@ -482,23 +470,82 @@ export default function SubmissionFlowScreen({ navigation, route }: Props) {
 
         {step === 'SUCCESS' && (
           <View style={[styles.stepContainer, styles.centerContent]}>
-            <ConfettiBurst isVisible={true} pieceCount={60} />
-            <XPChip xp={earnedXp} />
-            <View style={{ marginBottom: SPACE.lg }}>
-              <VoltPeek size={96} />
-            </View>
-            <Text variant="headingLg" color={COLORS.textPrimary} style={styles.successTitle}>
-              Proof Locked In!
-            </Text>
-            <Text variant="body" color={COLORS.textSecondary} style={{ textAlign: 'center', marginTop: 8, marginBottom: SPACE.xl, maxWidth: 280 }}>
-              Your squad streak is protected and your proof has been shared to the pact feed.
-            </Text>
+            {queuedOffline ? (
+              <>
+                <View style={styles.offlineIconCircle}>
+                  <Icon name="hourglass" size={40} color={COLORS.accentBlue} />
+                </View>
+                <Text
+                  variant="headingLg"
+                  color={COLORS.textPrimary}
+                  style={styles.successTitle}
+                >
+                  Proof Saved Offline
+                </Text>
+                <Text
+                  variant="body"
+                  color={COLORS.textSecondary}
+                  style={{ textAlign: 'center', marginTop: 8, marginBottom: SPACE.lg, maxWidth: 300 }}
+                >
+                  You're offline right now, so we've queued this proof. It will upload
+                  automatically as soon as your connection returns — no need to resubmit.
+                </Text>
+                <View style={styles.offlineBadge}>
+                  <Icon name="clock" size={14} color={COLORS.accentBlue} />
+                  <Text variant="caption" color={COLORS.accentBlue}>
+                    Waiting to sync
+                  </Text>
+                </View>
+              </>
+            ) : (
+              <>
+                <ConfettiBurst isVisible={true} pieceCount={60} />
+                <XPChip xp={earnedXp} />
+                <View style={{ marginBottom: SPACE.lg }}>
+                  <VoltPeek size={96} />
+                </View>
+                <Text
+                  variant="headingLg"
+                  color={COLORS.textPrimary}
+                  style={styles.successTitle}
+                >
+                  Proof Locked In!
+                </Text>
+                {earnedBadges.length > 0 && (
+                  <View style={styles.badgeUnlockRow}>
+                    {earnedBadges.map((badge) => (
+                      <View key={badge.id} style={styles.badgeUnlockChip}>
+                        <Text style={styles.badgeUnlockEmoji}>{badge.icon}</Text>
+                        <Text
+                          variant="caption"
+                          color={COLORS.textPrimary}
+                          style={styles.badgeUnlockName}
+                        >
+                          {badge.name}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+                )}
+                <Text
+                  variant="body"
+                  color={COLORS.textSecondary}
+                  style={{ textAlign: 'center', marginTop: 8, marginBottom: SPACE.xl, maxWidth: 280 }}
+                >
+                  Your squad streak is protected and your proof has been shared to the pact feed.
+                </Text>
+              </>
+            )}
             <Button
               label="Back to Feed ⚡"
               variant="primary"
               size="lg"
               onPress={() => {
-                try { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); } catch {}
+                if (!queuedOffline) {
+                  try {
+                    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                  } catch {}
+                }
                 handleClose();
               }}
               style={{ minWidth: 220 }}
@@ -562,20 +609,35 @@ const styles = StyleSheet.create({
     borderColor: COLORS.hairline,
   },
   centerContent: { justifyContent: 'center', alignItems: 'center', padding: SPACE.xl },
+  emptyActivities: {
+    alignItems: 'center',
+    paddingVertical: SPACE.xl,
+    paddingHorizontal: SPACE.lg,
+  },
+  emptyIconCircle: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: `${COLORS.accentBlue}15`,
+    borderWidth: 1,
+    borderColor: `${COLORS.accentBlue}30`,
+    marginBottom: SPACE.md,
+  },
+  emptyTitle: {
+    marginBottom: SPACE.xs,
+  },
+  emptySubtitle: {
+    marginBottom: SPACE.lg,
+    maxWidth: 320,
+  },
   placeholderText: {
     ...TYPOGRAPHY.body,
     color: COLORS.textTertiary,
     marginBottom: SPACE.xl,
     textAlign: 'center',
   },
-  mockBtn: {
-    backgroundColor: COLORS.accentBlue,
-    paddingHorizontal: SPACE.xl,
-    paddingVertical: SPACE.md,
-    borderRadius: RADIUS.full,
-    ...SHADOWS.raised,
-  },
-  mockBtnText: { ...TYPOGRAPHY.label, color: COLORS.bgBase },
   primaryBtn: {
     backgroundColor: COLORS.accentBlue,
     paddingHorizontal: SPACE.xl,
@@ -634,5 +696,51 @@ const styles = StyleSheet.create({
     ...TYPOGRAPHY.headline,
     color: COLORS.accentBlue,
     marginBottom: SPACE.xxl,
+  },
+  offlineIconCircle: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: `${COLORS.accentBlue}15`,
+    borderWidth: 1,
+    borderColor: `${COLORS.accentBlue}30`,
+    marginBottom: SPACE.lg,
+  },
+  offlineBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: SPACE.md,
+    paddingVertical: SPACE.xs,
+    borderRadius: RADIUS.pill,
+    backgroundColor: COLORS.accentMuted,
+    marginBottom: SPACE.xl,
+  },
+  badgeUnlockRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: SPACE.sm,
+    marginTop: SPACE.sm,
+    maxWidth: 320,
+  },
+  badgeUnlockChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: SPACE.md,
+    paddingVertical: SPACE.xs,
+    borderRadius: RADIUS.pill,
+    backgroundColor: `${COLORS.accentBlue}18`,
+    borderWidth: 1,
+    borderColor: `${COLORS.accentBlue}40`,
+  },
+  badgeUnlockEmoji: {
+    fontSize: 14,
+  },
+  badgeUnlockName: {
+    fontWeight: '700',
   },
 });

@@ -7,9 +7,9 @@ import { useCurrentUser, useUserGroups } from '@/hooks';
 import { useUserStreaks, useUserYearHeatmap } from '@/hooks/useStreaks';
 import { useUserSubmissions } from '@/hooks/useSubmissions';
 import { useUserBadges, useAllBadges } from '@/hooks/useBadges';
-import { supabase } from '@/services/supabase';
 import { useNavigation } from '@react-navigation/native';
 import { levelFromXp, xpProgressInLevel } from '@/utils/progression';
+import { badgeColor, hexToTint } from '@/utils/badgeVisuals';
 import { IconName } from '@/components/ui/Icon';
 
 export default function ProfileScreen() {
@@ -89,19 +89,27 @@ export default function ProfileScreen() {
             <Pressable
               hitSlop={8}
               style={styles.settingsBtn}
-              onPress={() => Alert.alert('Settings', 'Settings screen is Phase 9.')}
+              onPress={() => navigation.navigate('Settings')}
+              accessibilityRole="button"
+              accessibilityLabel="Settings"
             >
               <Icon name="gear" size={20} color={COLORS.textPrimary} />
             </Pressable>
           </View>
 
           <View style={styles.identity}>
-            <Avatar
-              src={currentUser?.avatarUrl}
-              name={currentUser?.displayName || user?.displayName}
-              size="xl"
-              status="online"
-            />
+            <Pressable
+              onPress={() => navigation.navigate('EditProfile')}
+              accessibilityRole="button"
+              accessibilityLabel="Edit profile photo"
+            >
+              <Avatar
+                src={currentUser?.avatarUrl}
+                name={currentUser?.displayName || user?.displayName}
+                size="xl"
+                status="online"
+              />
+            </Pressable>
             <View style={styles.identityText}>
               <Text variant="displaySm" color={COLORS.textPrimary}>
                 {currentUser?.displayName || user?.displayName || 'You'}
@@ -109,6 +117,16 @@ export default function ProfileScreen() {
               <Text variant="body" color={COLORS.textSecondary} style={styles.handle}>
                 @{currentUser?.username || user?.username || 'you'}
               </Text>
+              {currentUser?.bio || user?.bio ? (
+                <Text
+                  variant="bodySm"
+                  color={COLORS.textSecondary}
+                  style={styles.bio}
+                  numberOfLines={3}
+                >
+                  {currentUser?.bio ?? user?.bio}
+                </Text>
+              ) : null}
               <View style={styles.badgeRow}>
                 <Badge
                   label={`Level ${level} ${levelName}`}
@@ -146,10 +164,7 @@ export default function ProfileScreen() {
             variant="secondary"
             fullWidth
             leadingIcon="pencil-simple"
-            onPress={() => Alert.alert(
-              'Edit profile',
-              'Profile editing arrives in Phase 9. For now, you can update your avatar by tapping the avatar above.'
-            )}
+            onPress={() => navigation.navigate('EditProfile')}
           />
         </View>
 
@@ -174,42 +189,24 @@ export default function ProfileScreen() {
           />
         </View>
 
-        {/* Sign out */}
-        <View style={[styles.section, { marginTop: 8 }]}>
-          <Button
-            label="Sign out"
-            variant="ghost"
-            fullWidth
-            leadingIcon="sign-out"
-            onPress={() => {
-              Alert.alert('Sign out?', 'You can sign back in anytime.', [
-                { text: 'Cancel', style: 'cancel' },
-                {
-                  text: 'Sign out',
-                  style: 'destructive',
-                  onPress: async () => {
-                    try { await supabase.auth.signOut(); } catch {}
-                    useAuthStore.getState().logout();
-                    navigation.reset({ index: 0, routes: [{ name: 'Auth' }] });
-                  },
-                },
-              ]);
-            }}
-          />
-        </View>
-
         {/* Achievements */}
         <View style={styles.section}>
-          <View style={styles.sectionHeader}>
+          <Pressable
+            style={styles.sectionHeader}
+            onPress={() => navigation.navigate('Badges')}
+            accessibilityRole="button"
+            accessibilityLabel="View all achievements"
+          >
             <Text variant="eyebrow" color={COLORS.textSecondary}>
               Achievements
             </Text>
-            <Pressable hitSlop={6}>
+            <View style={styles.achievementsLink}>
               <Text variant="label" color={COLORS.accentBlue}>
                 {earnedBadges.length}/{allBadges.length}
               </Text>
-            </Pressable>
-          </View>
+              <Icon name="caret-right" size={14} color={COLORS.accentBlue} />
+            </View>
+          </Pressable>
           {achievements.length === 0 ? (
             <Card variant="flat" padding="lg" style={styles.emptyCard}>
               <Text variant="bodySm" color={COLORS.textSecondary} style={{ textAlign: 'center' }}>
@@ -219,7 +216,13 @@ export default function ProfileScreen() {
           ) : (
             <View style={styles.achGrid}>
               {achievements.slice(0, 8).map(a => (
-                <View key={a.id} style={[styles.achCell, !a.earned && styles.achCellLocked]}>
+                <Pressable
+                  key={a.id}
+                  onPress={() => navigation.navigate('Badges')}
+                  style={[styles.achCell, !a.earned && styles.achCellLocked]}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${a.label}${a.earned ? ', earned' : ', locked'}`}
+                >
                   <View style={[styles.achIcon, { backgroundColor: hexToTint(a.color, 0.14) }]}>
                     <Icon
                       name={a.icon}
@@ -234,7 +237,7 @@ export default function ProfileScreen() {
                   >
                     {a.label}
                   </Text>
-                </View>
+                </Pressable>
               ))}
             </View>
           )}
@@ -256,23 +259,6 @@ function StatCard({ value, label, icon, accent }: { value: string | number; labe
       <Text variant="caption" color={COLORS.textSecondary}>{label}</Text>
     </Card>
   );
-}
-
-function badgeColor(badgeId: string): string {
-  // Hash a badge ID into one of our 5 brand-aligned accent colors.
-  // Stable across renders (same id -> same color).
-  const palette = ['#FF5B1F', '#8B5CF6', '#2E9D6A', '#0EA5E9', '#F59E0B', '#EC4899'];
-  let h = 0;
-  for (let i = 0; i < badgeId.length; i++) h = (h << 5) - h + badgeId.charCodeAt(i);
-  return palette[Math.abs(h) % palette.length];
-}
-
-function hexToTint(hex: string, alpha: number) {
-  const h = hex.replace('#', '');
-  const r = parseInt(h.substring(0, 2), 16);
-  const g = parseInt(h.substring(2, 4), 16);
-  const b = parseInt(h.substring(4, 6), 16);
-  return `rgba(${r},${g},${b},${alpha})`;
 }
 
 const styles = StyleSheet.create({
@@ -306,6 +292,7 @@ const styles = StyleSheet.create({
   },
   identityText: { flex: 1 },
   handle: { marginTop: 2 },
+  bio: { marginTop: 6, lineHeight: 19 },
   badgeRow: { flexDirection: 'row', gap: 8, marginTop: 10, flexWrap: 'wrap' },
   xpBlock: { marginBottom: 16 },
   xpHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
@@ -323,6 +310,11 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 14,
+  },
+  achievementsLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
   },
   statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   statCard: { width: '48%', gap: 6 },

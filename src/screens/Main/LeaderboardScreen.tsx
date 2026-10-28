@@ -15,14 +15,19 @@ export default function LeaderboardScreen() {
   const { user } = useAuthStore();
   const { data: entries = [], isLoading } = useMyGroupMembers();
 
-  // Sort by XP desc, then by display name for stable ordering
+  // Rank by XP earned this month, then lifetime XP, then name for stability.
   const ranked = useMemo(() => {
     return [...entries]
-      .sort((a, b) => b.xp - a.xp || a.displayName.localeCompare(b.displayName))
+      .sort(
+        (a, b) =>
+          b.monthlyXp - a.monthlyXp ||
+          b.xp - a.xp ||
+          a.displayName.localeCompare(b.displayName)
+      )
       .map((e, i) => ({ ...e, rank: i + 1 }));
   }, [entries]);
 
-  const maxXp = ranked[0]?.xp ?? 0;
+  const maxXp = ranked[0]?.monthlyXp ?? 0;
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -33,7 +38,7 @@ export default function LeaderboardScreen() {
         </Text>
         <Text variant="body" color={COLORS.textSecondary} style={styles.subtitle}>
           {ranked.length > 0
-            ? `${ranked.length} ${ranked.length === 1 ? 'pact member' : 'pact members'} ranked by XP.`
+            ? `${ranked.length} ${ranked.length === 1 ? 'pact member' : 'pact members'} ranked by XP earned this month.`
             : "Join a pact to start the leaderboard."}
         </Text>
       </View>
@@ -74,7 +79,7 @@ export default function LeaderboardScreen() {
 }
 
 function Row({ item, maxXp, isYou }: { item: any; maxXp: number; isYou: boolean }) {
-  const fill = maxXp > 0 ? (item.xp / maxXp) * 100 : 0;
+  const fill = maxXp > 0 ? (item.monthlyXp / maxXp) * 100 : 0;
   const rankColor = RANK_COLORS[item.rank] ?? COLORS.textTertiary;
   const isTop3 = item.rank <= 3;
 
@@ -102,8 +107,8 @@ function Row({ item, maxXp, isYou }: { item: any; maxXp: number; isYou: boolean 
           </Text>
         </View>
         <View style={styles.xpBox}>
-          <Text variant="numericMd" color={COLORS.textPrimary}>{item.xp.toLocaleString()}</Text>
-          <Text variant="caption" color={COLORS.textTertiary}>XP</Text>
+          <Text variant="numericMd" color={COLORS.textPrimary}>{item.monthlyXp.toLocaleString()}</Text>
+          <Text variant="caption" color={COLORS.textTertiary}>this month</Text>
         </View>
       </View>
 

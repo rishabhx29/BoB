@@ -126,8 +126,8 @@ export default function GroupsScreen() {
         ListEmptyComponent={isLoading ? null : renderEmptyComponent}
         renderItem={({ item }) => {
           // The `emoji` column stores a Phosphor icon name (or a legacy unicode
-          // emoji if a row was created before Phase 4.3). Resolve it to a valid
-          // IconName and pick a tint that matches the group vibe.
+          // emoji for rows created before icons were standardised). Resolve it
+          // to a valid IconName and pick a tint that matches the group vibe.
           const visuals = vibeVisuals(item.vibe);
           const activities = activitiesByGroup[item.id] ?? [];
           const submittedToday = submissionStats?.submittedTodayByGroup[item.id] ?? new Set();
