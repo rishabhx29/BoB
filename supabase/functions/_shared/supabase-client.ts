@@ -30,3 +30,6 @@ export function getUserClient(req: Request): SupabaseClient {
     global: { headers: { Authorization: authHeader } },
   });
 }
+
+/** Back-compat alias used by the scheduled functions. */
+export const createAdminClient = getServiceClient;

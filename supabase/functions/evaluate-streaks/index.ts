@@ -1,8 +1,11 @@
 // supabase/functions/evaluate-streaks/index.ts
 // Scheduled daily maintenance function to evaluate streaks, consume shields,
-// and reset broken streaks for active pact members.
+// reset broken streaks, and evaluate badges for affected users.
+//
+// Invoked by pg_cron (see docs/sql/0003_gamification.sql) at 00:05 UTC.
 
-import { createAdminClient } from '../_shared/supabase-client.ts';
+import { getServiceClient } from '../_shared/supabase-client.ts';
+import { evaluateBadgesForUser } from '../_shared/gamification.ts';
 import { jsonResponse, errorResponse } from '../_shared/response.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 
@@ -11,8 +14,16 @@ Deno.serve(async (req) => {
     return new Response('ok', { headers: corsHeaders });
   }
 
+  // pg_cron calls this with the service-role key. Without this check any
+  // anonymous caller could trigger a full streak/badge sweep.
+  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+  const authHeader = req.headers.get('Authorization') ?? '';
+  if (!serviceKey || authHeader !== `Bearer ${serviceKey}`) {
+    return errorResponse('Service role required', 403);
+  }
+
   try {
-    const supabase = createAdminClient();
+    const supabase = getServiceClient();
     const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
     const sevenDaysAgo = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
 
@@ -30,10 +41,20 @@ Deno.serve(async (req) => {
     let shieldsApplied = 0;
     let streaksReset = 0;
 
+    const shieldUserIds = new Set<string>();
+    const resetRows: Array<{
+      user_id: string;
+      type: string;
+      title: string;
+      body: string;
+      deep_link: string;
+      is_read: boolean;
+    }> = [];
+
     for (const streak of (streaks ?? [])) {
       evaluated++;
 
-      // If last submission was yesterday or today, streak is healthy
+      // If last submission was yesterday or today, the streak is healthy.
       if (
         streak.last_submission_date === yesterday ||
         (streak.last_submission_date && streak.last_submission_date > yesterday)
@@ -41,12 +62,12 @@ Deno.serve(async (req) => {
         continue;
       }
 
-      // If yesterday was declared as a rest day, streak is protected
+      // If yesterday was declared as a rest day, the streak is protected.
       if (streak.rest_day_dates?.includes(yesterday)) {
         continue;
       }
 
-      // Day was missed! Check shield eligibility
+      // Day was missed! Check shield eligibility.
       const { data: user } = await supabase
         .from('users')
         .select('shields_available')
@@ -59,7 +80,7 @@ Deno.serve(async (req) => {
       );
 
       if (shieldsAvailable > 0 && !recentShieldUsed) {
-        // Apply streak shield
+        // Apply a streak shield.
         await supabase
           .from('users')
           .update({ shields_available: shieldsAvailable - 1 })
@@ -74,9 +95,10 @@ Deno.serve(async (req) => {
           })
           .eq('id', streak.id);
 
+        shieldUserIds.add(streak.user_id);
         shieldsApplied++;
       } else {
-        // Streak is broken
+        // Streak is broken.
         await supabase
           .from('streaks')
           .update({
@@ -85,7 +107,34 @@ Deno.serve(async (req) => {
           })
           .eq('id', streak.id);
 
+        resetRows.push({
+          user_id: streak.user_id,
+          type: 'streak_milestone',
+          title: 'Your streak took a hit 💔',
+          body: 'A missed day reset one of your streaks. Log proof today to start again.',
+          deep_link: 'streakpact://home',
+          is_read: false,
+        });
         streaksReset++;
+      }
+    }
+
+    // Notify reset users in one round trip (best effort).
+    if (resetRows.length > 0) {
+      const { error: notifyError } = await supabase.from('notifications').insert(resetRows);
+      if (notifyError) {
+        console.warn('[evaluate-streaks] Notification insert failed:', notifyError.message);
+      }
+    }
+
+    // Shield usage can unlock Shield Bearer — evaluate only affected users.
+    let badgesAwarded = 0;
+    for (const userId of shieldUserIds) {
+      try {
+        const awarded = await evaluateBadgesForUser(supabase, userId);
+        badgesAwarded += awarded.length;
+      } catch (err) {
+        console.warn(`[evaluate-streaks] Badge eval failed for ${userId}:`, err);
       }
     }
 
@@ -95,6 +144,7 @@ Deno.serve(async (req) => {
       totalEvaluated: evaluated,
       shieldsApplied,
       streaksReset,
+      badgesAwarded,
     });
   } catch (err: any) {
     return errorResponse(err.message ?? 'Internal Server Error', 500);

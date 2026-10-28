@@ -11,6 +11,14 @@ Deno.serve(async (req) => {
     return new Response('ok', { headers: corsHeaders });
   }
 
+  // pg_cron calls this with the service-role key. Without this check any
+  // anonymous caller could regenerate every squad's recap.
+  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+  const authHeader = req.headers.get('Authorization') ?? '';
+  if (!serviceKey || authHeader !== `Bearer ${serviceKey}`) {
+    return errorResponse('Service role required', 403);
+  }
+
   try {
     const supabase = createAdminClient();
     const now = new Date();
@@ -40,7 +48,7 @@ Deno.serve(async (req) => {
       // 3. Fetch submissions in the last 7 days
       const { data: submissions } = await supabase
         .from('submissions')
-        .select('id, user_id, activity_id, client_timestamp, xp_awarded')
+        .select('id, user_id, activity_id, client_timestamp, xp_earned')
         .eq('group_id', group.id)
         .gte('client_timestamp', sevenDaysAgo);
 

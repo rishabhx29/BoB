@@ -2,8 +2,13 @@
 // Idempotent dev seed. Creates test users, a populated group, activities,
 // and a few submissions. Idempotent — safe to re-run.
 //
-// Run via: `supabase functions invoke seed-dev --no-verify-jwt`
-// Or hit the deployed URL: <project>.supabase.co/functions/v1/seed-dev
+// This function is disabled unless the project sets SEED_DEV_SECRET and the
+// caller sends it as `x-seed-secret`. Never deploy it without a secret.
+//
+// Run via:
+//   supabase secrets set SEED_DEV_SECRET=<long-random-value>
+//   curl -X POST <project>.supabase.co/functions/v1/seed-dev \
+//     -H "x-seed-secret: <value>"
 //
 // Default test accounts (all password: `streakdev123`):
 //   alex@streakpact.app   (admin of "Morning Hustle")
@@ -13,6 +18,8 @@
 import { handleCors } from '../_shared/cors.ts';
 import { jsonResponse, errorResponse } from '../_shared/response.ts';
 import { getServiceClient } from '../_shared/supabase-client.ts';
+
+const SEED_DEV_SECRET = Deno.env.get('SEED_DEV_SECRET') ?? '';
 
 const TEST_USERS = [
   { email: 'alex@streakpact.app',  username: 'alex',  display_name: 'Alex Rivera',  avatar_url: 'https://i.pravatar.cc/200?u=alex' },
@@ -53,6 +60,12 @@ async function insertSubmissionIfMissing(
 Deno.serve(async (req: Request) => {
   const cors = handleCors(req);
   if (cors) return cors;
+
+  // Deployed without JWT verification by design (it runs before any user
+  // exists), so it must carry its own shared secret.
+  if (!SEED_DEV_SECRET || req.headers.get('x-seed-secret') !== SEED_DEV_SECRET) {
+    return errorResponse('seed_dev_disabled', 403);
+  }
 
   const supabase = getServiceClient();
 
