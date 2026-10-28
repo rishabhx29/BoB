@@ -1,7 +1,12 @@
 import React, { useCallback } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { NavigationContainer, DarkTheme, Theme } from '@react-navigation/native';
+import {
+  NavigationContainer,
+  DarkTheme,
+  Theme,
+  useNavigationContainerRef,
+} from '@react-navigation/native';
 import { useFonts } from 'expo-font';
 import {
   Inter_400Regular,
@@ -26,44 +31,14 @@ import RootNavigator from './src/navigation';
 import { queryClient } from './src/services/queryClient';
 import { COLORS } from './constants/theme';
 import { useAuthSync } from './src/hooks/useAuthSync';
-import { useDevAuthBypass } from './src/hooks/useDevAuthBypass';
+import { usePendingInvite } from './src/hooks/usePendingInvite';
+import { SyncStatusPill } from './src/components/ui/SyncStatusPill';
+import { NotificationSync } from './src/components/notifications/NotificationSync';
+import { PushSync } from './src/components/notifications/PushSync';
+import { linking } from './src/navigation/linking';
+import { RootStackParamList } from './src/types';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
-
-const linking: any = {
-  prefixes: ['streakpact://', 'exp://'],
-  config: {
-    screens: {
-      Auth: {
-        screens: {
-          Splash: '',
-          Onboarding: 'onboarding',
-          Login: 'login',
-          Register: 'register',
-          SetupProfile: 'setup-profile',
-          JoinOrCreate: 'join-or-create',
-          BiometricSetup: 'biometric-setup',
-        },
-      },
-      Main: {
-        screens: {
-          Home: 'home',
-          Groups: 'groups',
-          Leaderboard: 'leaderboard',
-          Profile: 'profile',
-        },
-      },
-      JoinGroup: 'join/:code',
-      CreateGroup: 'create-group',
-      GroupHome: 'group/:groupId',
-      GroupSettings: 'group/:groupId/settings',
-      CreateActivity: 'group/:groupId/create-activity',
-      ActivityDetail: 'group/:groupId/activity',
-      SubmissionFlow: 'submit',
-      Comparative: 'comparative/:member1Id/:member2Id',
-    },
-  },
-};
 
 function buildNavTheme(): Theme {
   return {
@@ -81,17 +56,17 @@ function buildNavTheme(): Theme {
 }
 
 export default function App() {
-  // Mount the auth sync listener once at the root.
+  // Mount the auth sync listener once at the root. It restores the session,
+  // fetches the matching `public.users` row and lets RootNavigator decide
+  // between Auth, SetupProfile and Main.
   useAuthSync();
 
-  // Dev-only: if the sandbox clock is skewed relative to Supabase, install
-  // a mock auth session so the rest of the app can be smoke-tested.
-  // No-op on real devices because they have correct clocks.
-  useDevAuthBypass();
+  // Holds an invite code captured before sign-in and opens JoinGroup once the
+  // auth gate reaches Main.
+  const navigationRef = useNavigationContainerRef<RootStackParamList>();
+  const { handleReady } = usePendingInvite(navigationRef);
 
   // Dark cosmos is the only theme — ignore system color scheme.
-  const isDark = true;
-
   const [fontsLoaded, fontError] = useFonts({
     'Inter-Regular': Inter_400Regular,
     'Inter-Medium': Inter_500Medium,
@@ -119,24 +94,23 @@ export default function App() {
     <QueryClientProvider client={queryClient}>
       <SafeAreaProvider>
         <View style={{ flex: 1, backgroundColor: COLORS.bgBase }} onLayout={onLayoutRootView}>
-          <NavigationContainer theme={buildNavTheme()} linking={linking}>
+          <NavigationContainer
+            ref={navigationRef}
+            onReady={handleReady}
+            theme={buildNavTheme()}
+            linking={linking}
+          >
             <RootNavigator />
           </NavigationContainer>
+          {/* Keeps the bell count and notification list live app-wide. */}
+          <NotificationSync />
+          {/* Native push: token registration + tap routing. */}
+          <PushSync navigationRef={navigationRef} />
+          {/* Drives offline submission sync and shows queue state app-wide. */}
+          <SyncStatusPill />
           <StatusBar style="light" />
         </View>
       </SafeAreaProvider>
     </QueryClientProvider>
   );
 }
-
-/**
- * Dev-only auth bypass.
- *
- * Probes Supabase auth. If the response says "JWT issued at future",
- * that means the local clock is ahead of Supabase's clock — a sandbox
- * artifact, not a production issue. We install a mock session so the
- * rest of the app can be smoke-tested end-to-end.
- *
- * On a real device with a correct clock, the probe succeeds, this is
- * a no-op, and real Supabase auth runs as expected.
- */
